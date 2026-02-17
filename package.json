@@ -1,0 +1,58 @@
+{
+	"name": "unfeed_social",
+	"version": "1.0.0",
+	"description": "Unfeed AI desktop client – social media feed scroller",
+	"type": "module",
+	"main": "src/main/index.js",
+	"scripts": {
+		"start": "electron-forge start",
+		"package": "electron-forge package",
+		"make": "electron-forge make"
+	},
+	"dependencies": {
+		"dotenv": "^16.3.1",
+		"electron-store": "^8.1.0",
+		"electron-updater": "^6.1.0"
+	},
+	"devDependencies": {
+		"@electron-forge/cli": "^7.2.0",
+		"@electron-forge/maker-deb": "^7.2.0",
+		"@electron-forge/maker-dmg": "^7.2.0",
+		"@electron-forge/maker-squirrel": "^7.2.0",
+		"@electron-forge/plugin-auto-unpack-natives": "^7.2.0",
+		"electron": "^28.0.0"
+	},
+	"config": {
+		"forge": {
+			"packagerConfig": {
+				"asar": true
+			},
+			"makers": [
+				{
+					"name": "@electron-forge/maker-squirrel",
+					"config": {
+						"name": "unfeed-client"
+					}
+				},
+				{
+					"name": "@electron-forge/maker-dmg",
+					"config": {
+						"name": "Unfeed Client"
+					}
+				},
+				{
+					"name": "@electron-forge/maker-deb",
+					"config": {
+						"name": "unfeed-client"
+					}
+				}
+			],
+			"plugins": [
+				{
+					"name": "@electron-forge/plugin-auto-unpack-natives",
+					"config": {}
+				}
+			]
+		}
+	}
+}

@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Unfeed</title>
+		<style>
+			* {
+				box-sizing: border-box;
+			}
+			body {
+				font-family:
+					system-ui,
+					-apple-system,
+					sans-serif;
+				margin: 0;
+				padding: 16px;
+				background: #0f0f0f;
+				color: #e0e0e0;
+				min-height: 100vh;
+			}
+			h1 {
+				font-size: 1.2rem;
+				font-weight: 600;
+				margin: 0 0 4px;
+			}
+			p {
+				margin: 0 0 10px;
+				color: #999;
+				font-size: 0.875rem;
+			}
+			input,
+			button {
+				width: 100%;
+				padding: 8px 12px;
+				margin-bottom: 8px;
+				border-radius: 6px;
+				border: 1px solid #333;
+				background: #1a1a1a;
+				color: #e0e0e0;
+				font-size: 13px;
+			}
+			button {
+				cursor: pointer;
+				font-weight: 500;
+			}
+			/* Primary: one main action (Scroll) */
+			button.btn-primary {
+				background: #2a2a2a;
+				color: #fff;
+				border: 1px solid #404040;
+			}
+			button.btn-primary:hover {
+				background: #333;
+				border-color: #505050;
+			}
+			/* Secondary: Connect social account – outline style */
+			button.btn-secondary {
+				background: transparent;
+				color: #b0b0b0;
+				border: 1px solid #404040;
+			}
+			button.btn-secondary:hover {
+				background: #1f1f1f;
+				color: #e0e0e0;
+			}
+			/* Tertiary: Log out – text link style */
+			button.btn-link {
+				background: transparent;
+				color: #888;
+				border: none;
+				margin-top: 8px;
+				padding: 6px 0;
+				width: auto;
+				font-weight: 400;
+			}
+			button.btn-link:hover {
+				color: #aaa;
+				text-decoration: underline;
+			}
+			button:disabled {
+				opacity: 0.5;
+				cursor: not-allowed;
+			}
+			.card {
+				background: #0f0f0f;
+				border-radius: 8px;
+				padding: 14px;
+				margin-bottom: 10px;
+				border: none;
+			}
+			.hidden {
+				display: none;
+			}
+			.error {
+				color: #ef4444;
+				font-size: 0.8rem;
+				margin-top: 2px;
+			}
+			.success {
+				color: #22c55e;
+				font-size: 0.8rem;
+				margin-top: 2px;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="card">
+			<h1>Unfeed</h1>
+			<p>Unfeed Social Scroller doom scrolls your social media feeds so you don't have to.</p>
+			<p
+				id="apiBaseHint"
+				style="font-size: 0.75rem; color: #666; margin-bottom: 8px"
+			></p>
+			<div id="loginForm">
+				<div id="emailRow">
+					<input
+						type="email"
+						id="email"
+						placeholder="Your Unfeed account email"
+						autocomplete="email"
+					/>
+					<button type="button" id="requestPin" class="btn-primary">
+						Send login code
+					</button>
+				</div>
+				<div id="pinRow" class="hidden">
+					<input
+						type="text"
+						id="pin"
+						placeholder="6-digit code"
+						maxlength="6"
+						autocomplete="one-time-code"
+					/>
+					<button id="verifyPin" class="btn-primary">Verify</button>
+				</div>
+				<div id="authError" class="error hidden"></div>
+				<div id="authSuccess" class="success hidden"></div>
+				<button type="button" id="quit" class="btn-link">Quit</button>
+			</div>
+		</div>
+		<script src="login.js"></script>
+	</body>
+</html>
