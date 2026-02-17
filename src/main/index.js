@@ -1,27 +1,21 @@
 /**
  * Unfeed client – Electron main process.
- * System tray app: scrolls social media feeds to unfeed.ai via authenticated API.
- * API base URL is read from .env (UNFEED_API_BASE) or defaults to https://unfeed.ai.
+ * System tray app: scrolls social media feeds and uploads them to unfeed.ai.
  */
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// src/main -> repo root: two levels up
 dotenv.config({ path: path.join(__dirname, "..", "..", ".env") });
 
 import { app, BrowserWindow, session, ipcMain } from "electron";
-import {
-	createTray,
-	updateTrayMenu,
-	destroyTray,
-	getTrayBounds,
-} from "./tray.js";
+import { createTray, updateTrayMenu, destroyTray, getTrayBounds } from "./tray.js";
 import { getOpenAtLogin, getApiBase, getJwt } from "./store.js";
 import { registerIpcHandlers } from "./ipc-handlers.js";
 import { startScheduler } from "./scheduler.js";
 import { setupAutoUpdate } from "./updater.js";
+import { isDev, devLog } from "./log.js";
 
 registerIpcHandlers();
 
@@ -31,7 +25,6 @@ let loginWindow = null;
 let popupWindow = null;
 let tray = null;
 
-// IPC: window lifecycle (handlers need closure over login/popup refs)
 ipcMain.handle("loginComplete", () => {
 	loginWindow?.close();
 });
@@ -42,11 +35,6 @@ ipcMain.handle("logoutComplete", () => {
 ipcMain.handle("quit", () => {
 	app.quit();
 });
-
-const isDev =
-	process.env.NODE_ENV === "development" ||
-	process.defaultApp ||
-	/[\\/]electron/.test(process.execPath);
 
 const preloadPath = path.join(__dirname, "..", "preload", "preload.cjs");
 const loginPath = path.join(__dirname, "..", "renderer", "login.html");
@@ -103,7 +91,6 @@ function createPopupWindow() {
 		popupWindow = null;
 	});
 	popupWindow.on("blur", () => {
-		// Close popup when focus leaves (click outside)
 		if (popupWindow && !popupWindow.isDestroyed()) {
 			popupWindow.close();
 		}
@@ -115,7 +102,6 @@ function createPopupWindow() {
 function positionPopupUnderTray() {
 	const bounds = getTrayBounds();
 	if (!bounds || !popupWindow || popupWindow.isDestroyed()) return;
-	// Tray icon is in menu bar (top). Position popup below it, right-aligned.
 	const x = Math.round(bounds.x + bounds.width - POPUP_WIDTH);
 	const y = Math.round(bounds.y + bounds.height + 4);
 	popupWindow.setPosition(x, y);
@@ -140,10 +126,9 @@ function showLoginWindow() {
 	createLoginWindow();
 }
 
-/** Called when user clicks tray icon. */
+/** Called when user clicks the tray icon. */
 function onTrayClick() {
 	if (getJwt()) {
-		// Toggle popup: if open and visible, close it; otherwise show it
 		if (popupWindow && !popupWindow.isDestroyed() && popupWindow.isVisible()) {
 			popupWindow.close();
 		} else {
@@ -156,12 +141,10 @@ function onTrayClick() {
 
 function initApp() {
 	tray = createTray(onTrayClick);
-	updateTrayMenu(loginWindow, popupWindow, onTrayClick);
+	updateTrayMenu();
 	startScheduler();
 
-	if (getJwt()) {
-		// Logged in: no window; user uses tray popup
-	} else {
+	if (!getJwt()) {
 		createLoginWindow();
 	}
 }
@@ -171,12 +154,10 @@ app.whenReady().then(() => {
 		app.dock.hide();
 	}
 	try {
-		app.setLoginItemSettings({
-			openAtLogin: getOpenAtLogin(),
-		});
+		app.setLoginItemSettings({ openAtLogin: getOpenAtLogin() });
 	} catch {}
 	setupAutoUpdate();
-	if (isDev) console.log("[client] API base:", getApiBase());
+	devLog("[main] API base:", getApiBase());
 	initApp();
 
 	app.on("activate", () => {
@@ -195,46 +176,38 @@ app.on("before-quit", () => {
 });
 
 /**
- * Get the persistent session for a social media platform (cookies persist across restarts).
- * @param {string} platformId - Platform identifier (e.g., "x")
- * @returns {Session}
+ * Get the persistent session for a social media platform.
+ * @param {string} platformId - e.g. "x"
+ * @returns {Electron.Session}
  */
 export function getSocialSession(platformId) {
-	const partition = `persist:socialfeed-${platformId}`;
-	return session.fromPartition(partition, { cache: true });
+	return session.fromPartition(`persist:socialfeed-${platformId}`, { cache: true });
 }
 
 /**
  * Create a BrowserWindow that uses a platform's persistent session.
- * @param {string} platformId - Platform identifier (e.g., "x")
- * @param {object} options - BrowserWindow options
+ * @param {string} platformId - e.g. "x"
+ * @param {Electron.BrowserWindowConstructorOptions} options
  * @returns {BrowserWindow}
  */
 export function createSocialBrowserWindow(platformId, options = {}) {
-	const sess = getSocialSession(platformId);
-	const win = new BrowserWindow({
+	return new BrowserWindow({
 		...options,
 		webPreferences: {
 			...options.webPreferences,
-			session: sess,
+			session: getSocialSession(platformId),
 			contextIsolation: true,
 			nodeIntegration: false,
 		},
 	});
-	return win;
 }
 
-
-export function getMainWindow() {
-	return loginWindow;
-}
 export function getLoginWindow() {
 	return loginWindow;
 }
 export function getPopupWindow() {
 	return popupWindow;
 }
-
 export function getTray() {
 	return tray;
 }

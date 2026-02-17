@@ -1,6 +1,6 @@
 /**
  * Persistent config using electron-store.
- * JWT is stored via safeStorage when available (OS keychain).
+ * JWT is encrypted via safeStorage (OS keychain) when available.
  */
 import Store from "electron-store";
 import { safeStorage } from "electron";
@@ -43,10 +43,7 @@ export function setJwt(token) {
 	}
 	if (useEncryption()) {
 		try {
-			store.set(
-				JWT_ENCRYPTED_KEY,
-				safeStorage.encryptString(token).toString("base64"),
-			);
+			store.set(JWT_ENCRYPTED_KEY, safeStorage.encryptString(token).toString("base64"));
 			store.delete(JWT_KEY);
 		} catch {
 			store.set(JWT_KEY, token);
@@ -61,14 +58,13 @@ export function getApiBase() {
 	return process.env.UNFEED_API_BASE?.trim() || DEFAULT_API_BASE;
 }
 
-/** Minimum 2h to match server rate limit. */
+/** @returns {number} Clamped between 2–24 hours. */
 export function getScrollIntervalHours() {
-	const v =
-		store.get(SCROLL_INTERVAL_HOURS_KEY) ?? DEFAULT_SCROLL_INTERVAL_HOURS;
+	const v = store.get(SCROLL_INTERVAL_HOURS_KEY) ?? DEFAULT_SCROLL_INTERVAL_HOURS;
 	return Math.max(2, Math.min(24, v));
 }
 
-/** Minimum 2h to match server rate limit (at most 1 social feed scroll upload per 2h). */
+/** @param {number} hours - Clamped between 2–24 hours. */
 export function setScrollIntervalHours(hours) {
 	store.set(SCROLL_INTERVAL_HOURS_KEY, Math.max(2, Math.min(24, hours)));
 }
@@ -82,45 +78,27 @@ export function setOpenAtLogin(value) {
 }
 
 /**
- * Get cached username for a platform.
- * @param {string} platformId - Platform identifier (e.g., "x")
+ * @param {string} platformId
  * @returns {string | null}
  */
 export function getCachedSocialUsername(platformId) {
-	const key = `cachedSocialUsernames.${platformId}`;
-	return store.get(key) ?? null;
+	return store.get(`cachedSocialUsernames.${platformId}`) ?? null;
 }
 
 /**
- * Set cached username for a platform.
- * @param {string} platformId - Platform identifier (e.g., "x")
- * @param {string | null} username - Username to cache, or null to clear
+ * @param {string} platformId
+ * @param {string | null} username
  */
 export function setCachedSocialUsername(platformId, username) {
 	const key = `cachedSocialUsernames.${platformId}`;
-	if (username) {
-		store.set(key, username);
-	} else {
-		store.delete(key);
-	}
+	username ? store.set(key, username) : store.delete(key);
 }
 
-/**
- * Clear all cached social usernames for all platforms.
- */
+/** Clear all cached social usernames across platforms. */
 export function clearAllCachedSocialUsernames() {
-	const storeData = store.store; // Access the underlying data object
-	const keysToDelete = [];
-	
-	// Find all keys that match the pattern cachedSocialUsernames.*
-	for (const key of Object.keys(storeData)) {
+	for (const key of Object.keys(store.store)) {
 		if (key.startsWith("cachedSocialUsernames.")) {
-			keysToDelete.push(key);
+			store.delete(key);
 		}
-	}
-	
-	// Delete all found keys
-	for (const key of keysToDelete) {
-		store.delete(key);
 	}
 }

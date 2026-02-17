@@ -1,6 +1,5 @@
 /**
- * Tray popup UI: scroll, status, connect social accounts, open at login, logout.
- * Uses same IPC as login (preload exposes unfeed).
+ * Tray popup UI: status, connect social accounts, scroll now, settings.
  */
 (function () {
 	const feedStatus = document.getElementById("feedStatus");
@@ -15,7 +14,8 @@
 	const scrollText = document.getElementById("scrollProgressText");
 	const scrollFill = document.getElementById("scrollProgressFill");
 	const lastScrollTime = document.getElementById("lastScrollTime");
-	const platformId = "x"; // Currently supporting X platform
+
+	const platformId = "x";
 	let platformConnected = false;
 
 	function showFeedStatus(text) {
@@ -43,15 +43,12 @@
 
 	function formatTimeAgo(timestamp) {
 		if (!timestamp) return "";
-		const now = Date.now();
-		const then = new Date(timestamp).getTime();
-		const diffMs = now - then;
-		const diffSec = Math.floor(diffMs / 1000);
-		const diffMin = Math.floor(diffSec / 60);
+		const diffMs = Date.now() - new Date(timestamp).getTime();
+		const diffMin = Math.floor(diffMs / 60_000);
 		const diffHour = Math.floor(diffMin / 60);
 		const diffDay = Math.floor(diffHour / 24);
 
-		if (diffSec < 60) return "just now";
+		if (diffMin < 1) return "just now";
 		if (diffMin < 60) return `${diffMin}m ago`;
 		if (diffHour < 24) return `${diffHour}h ago`;
 		if (diffDay < 7) return `${diffDay}d ago`;
@@ -62,11 +59,7 @@
 		if (!lastScrollTime || !window.unfeed?.getSocialFeedStatus) return;
 		try {
 			const s = await window.unfeed.getSocialFeedStatus();
-			if (s.error || !s.lastUploadAt) {
-				lastScrollTime.textContent = "";
-				return;
-			}
-			lastScrollTime.textContent = formatTimeAgo(s.lastUploadAt);
+			lastScrollTime.textContent = (!s.error && s.lastUploadAt) ? formatTimeAgo(s.lastUploadAt) : "";
 		} catch {
 			lastScrollTime.textContent = "";
 		}
@@ -76,11 +69,7 @@
 		if (!feedStatus || !window.unfeed?.getSocialFeedStatus) return;
 		try {
 			const s = await window.unfeed.getSocialFeedStatus();
-			if (s.error) {
-				showFeedStatus("Error: " + s.error);
-			} else {
-				hideFeedStatus();
-			}
+			s.error ? showFeedStatus("Error: " + s.error) : hideFeedStatus();
 		} catch {
 			hideFeedStatus();
 		}
@@ -99,8 +88,9 @@
 			const info = await window.unfeed.getSocialAccountInfo(platformId);
 			const ok = !!info?.connected;
 			platformConnected = ok;
-			const handle = info?.username ? `@${info.username}` : null;
-			platformAccountInfo.textContent = ok ? handle || "Connected (user unknown)" : "Not connected";
+			platformAccountInfo.textContent = ok
+				? (info?.username ? `@${info.username}` : "Connected")
+				: "Not connected";
 			connectPlatformBtn.textContent = ok ? "Sign out" : "Connect";
 			if (scrollBtn) scrollBtn.disabled = !ok;
 		} catch {
@@ -120,13 +110,9 @@
 				return;
 			}
 			const payload = decodeJwtPayload(token);
-			const id =
-				payload?.email ||
-				payload?.username ||
-				payload?.name ||
-				payload?.sub ||
-				"Logged in";
-			unfeedAccountInfo.textContent = String(id);
+			unfeedAccountInfo.textContent = String(
+				payload?.email || payload?.username || payload?.name || payload?.sub || "Logged in",
+			);
 		} catch {
 			unfeedAccountInfo.textContent = "Logged in";
 		}
@@ -141,7 +127,6 @@
 
 	async function init() {
 		if (!window.unfeed) {
-			console.error("window.unfeed not available - preload script may not have loaded");
 			showFeedStatus("Error: Application not initialized");
 			if (connectPlatformBtn) connectPlatformBtn.disabled = true;
 			return;
@@ -155,61 +140,41 @@
 		]);
 	}
 
+	// Event listeners
 	openAtLoginCheck?.addEventListener("change", async () => {
-		if (!window.unfeed?.setOpenAtLogin) return;
-		await window.unfeed.setOpenAtLogin(openAtLoginCheck.checked);
+		if (window.unfeed?.setOpenAtLogin) await window.unfeed.setOpenAtLogin(openAtLoginCheck.checked);
 	});
 
-	if (connectPlatformBtn) {
-		connectPlatformBtn.addEventListener("click", async () => {
-			console.log("Connect button clicked, platformConnected:", platformConnected);
-			connectPlatformBtn.disabled = true;
-			try {
-				if (platformConnected) {
-					if (!window.unfeed?.clearSocialSession) {
-						console.error("clearSocialSession not available");
-						showFeedStatus("Error: Sign out function not available");
-						return;
-					}
-					await window.unfeed.clearSocialSession(platformId);
-				} else {
-					if (!window.unfeed) {
-						console.error("window.unfeed not available");
-						showFeedStatus("Error: Application not initialized");
-						return;
-					}
-					if (!window.unfeed.openSocialLogin) {
-						console.error("openSocialLogin not available");
-						showFeedStatus("Error: Login function not available");
-						return;
-					}
-					console.log("Calling openSocialLogin for platform:", platformId);
-					const result = await window.unfeed.openSocialLogin(platformId);
-					console.log("openSocialLogin result:", result);
-					if (result && !result.ok) {
-						console.error("Login failed:", result.error);
-						showFeedStatus("Error: " + (result.error || "Failed to open login window"));
-					}
+	connectPlatformBtn?.addEventListener("click", async () => {
+		connectPlatformBtn.disabled = true;
+		try {
+			if (platformConnected) {
+				if (window.unfeed?.clearSocialSession) await window.unfeed.clearSocialSession(platformId);
+			} else {
+				if (!window.unfeed?.openSocialLogin) {
+					showFeedStatus("Error: Login function not available");
+					return;
 				}
-				await refreshPlatformLabel();
-			} catch (error) {
-				console.error("Error in connect button:", error);
-				showFeedStatus("Error: " + (error?.message || "Unknown error"));
-			} finally {
-				connectPlatformBtn.disabled = false;
+				const result = await window.unfeed.openSocialLogin(platformId);
+				if (result && !result.ok) {
+					showFeedStatus("Error: " + (result.error || "Failed to open login window"));
+				}
 			}
-		});
-	} else {
-		console.error("connectPlatformBtn element not found");
-	}
+			await refreshPlatformLabel();
+		} catch (error) {
+			showFeedStatus("Error: " + (error?.message || "Unknown error"));
+		} finally {
+			connectPlatformBtn.disabled = false;
+		}
+	});
 
 	function showScrollProgress(collected, max) {
 		if (!scrollRow || !scrollText || !scrollFill) return;
 		scrollRow.style.display = "flex";
 		scrollText.textContent = collected + " / " + max;
-		const pct = max > 0 ? Math.min(100, Math.round((collected / max) * 100)) : 0;
-		scrollFill.style.width = pct + "%";
+		scrollFill.style.width = (max > 0 ? Math.min(100, Math.round((collected / max) * 100)) : 0) + "%";
 	}
+
 	function hideScrollProgress() {
 		if (scrollRow) scrollRow.style.display = "none";
 	}
@@ -221,8 +186,9 @@
 		try {
 			const result = await window.unfeed.runScrollNow();
 			hideScrollProgress();
-			if (result?.error) showFeedStatus("Error: " + result.error);
-			else {
+			if (result?.error) {
+				showFeedStatus("Error: " + result.error);
+			} else {
 				await Promise.all([refreshFeedStatus(), refreshLastScrollTime()]);
 			}
 		} finally {
@@ -235,20 +201,12 @@
 		if (!window.unfeed?.setJwt) return;
 		logoutBtn.disabled = true;
 		try {
-			// Clear all social accounts and their local storage first
-			if (window.unfeed?.clearAllSocialSessions) {
-				console.log("Clearing all social accounts...");
-				await window.unfeed.clearAllSocialSessions();
-			}
-			// Then clear the unfeed JWT
+			if (window.unfeed?.clearAllSocialSessions) await window.unfeed.clearAllSocialSessions();
 			await window.unfeed.setJwt(null);
 			if (unfeedAccountInfo) unfeedAccountInfo.textContent = "Not logged in";
-			// Refresh platform labels to show disconnected state
 			await refreshPlatformLabel();
 			window.unfeed?.logoutComplete?.();
-		} catch (error) {
-			console.error("Error during logout:", error);
-			// Still try to clear JWT even if clearing social sessions failed
+		} catch {
 			await window.unfeed.setJwt(null);
 			if (unfeedAccountInfo) unfeedAccountInfo.textContent = "Not logged in";
 			window.unfeed?.logoutComplete?.();

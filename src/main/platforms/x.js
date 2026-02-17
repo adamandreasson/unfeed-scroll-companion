@@ -1,22 +1,22 @@
 /**
  * X (Twitter) platform implementation.
- * Handles login, session management, and feed scrolling for X.com.
+ * Handles login, session management, and feed scrolling for x.com.
  */
 import { BrowserWindow } from "electron";
 import { PlatformBase } from "./base.js";
 import { getSocialSession } from "../index.js";
 import { getCachedSocialUsername, setCachedSocialUsername } from "../store.js";
+import { devLog, devWarn } from "../log.js";
 
 const X_HOME = "https://x.com/home";
 const X_LOGIN = "https://x.com/i/flow/login";
+
 const DYNAMIC_CONTENT_DELAY_MS = 400;
 const SCROLL_DISCOVERY_DELAY_MS = 300;
-const TWEET_PROCESSING_DELAY_MS = 400;
-const NAVIGATION_TIMEOUT_MS = 60000;
+const POST_PROCESSING_DELAY_MS = 400;
+const NAVIGATION_TIMEOUT_MS = 60_000;
 
-const SCROLLER_LOG_PREFIX = "[scroller]";
-
-/** Run in page: return DOM stats to debug why no posts are found. */
+/** Page diagnostic: returns DOM stats useful for debugging empty feeds. */
 const PAGE_DIAGNOSTIC_SCRIPT = `
 (function() {
 	const main = document.querySelector("main");
@@ -32,19 +32,17 @@ const PAGE_DIAGNOSTIC_SCRIPT = `
 	}
 	return {
 		hasMain: !!main,
-		articleCount: articleCount,
+		articleCount,
 		firstArticleTextLength: firstArticleText.length,
-		firstArticleTextPreview: firstArticleText.slice(0, 100),
-		firstArticleHasStatusLink: firstArticleHasStatusLink,
+		firstArticleHasStatusLink,
 		documentReadyState: document.readyState,
-		bodyChildCount: document.body ? document.body.children.length : 0
 	};
 })();
 `;
 
 /**
- * Script run in page context to get the next post. Must be a string that evaluates to an async function
- * returning the post object or null. Receives { seenIdsOnPage, dynamicContentTimeout }.
+ * In-page script: finds the next unprocessed post in the visible viewport.
+ * Returns the post object or null. Receives { seenIdsOnPage, dynamicContentTimeout }.
  */
 const GET_NEXT_POST_SCRIPT = `
 (async function(args) {
@@ -61,80 +59,73 @@ const GET_NEXT_POST_SCRIPT = `
 				el.removeAttribute(HIGHLIGHT_ATTR);
 			}
 		}
-		async function expandInlineShowMore(root) {
+
+		async function expandShowMore(root) {
 			if (!root) return;
-			const all = root.querySelectorAll("*");
 			const candidates = [];
-			for (let i = 0; i < all.length; i++) {
-				const el = all[i];
-				const text = el.textContent ? el.textContent.trim() : "";
-				if (!text || text !== "Show more") continue;
-				if (el.closest("a[href]")) continue;
-				candidates.push(el);
+			for (const el of root.querySelectorAll("*")) {
+				const text = (el.textContent || "").trim();
+				if (text === "Show more" && !el.closest("a[href]")) candidates.push(el);
 			}
-			for (let j = 0; j < candidates.length; j++) {
-				try {
-					candidates[j].dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
-				} catch (_) {}
+			for (const el of candidates) {
+				try { el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window })); } catch (_) {}
 			}
-			if (candidates.length > 0) {
-				await new Promise(function(r) { setTimeout(r, dynamicContentTimeout); });
-			}
+			if (candidates.length) await new Promise(r => setTimeout(r, dynamicContentTimeout));
 		}
-		function cleanPostText(raw) {
+
+		function cleanText(raw) {
 			if (!raw) return "";
-			var parts = raw.split("\\n");
-			var out = [];
-			for (let i = 0; i < parts.length; i++) {
-				var l = parts[i].trim();
-				if (!l || l === "Show more" || l === "Show more replies") continue;
-				out.push(l);
-			}
-			return out.join("\\n").trim();
+			return raw.split("\\n")
+				.map(l => l.trim())
+				.filter(l => l && l !== "Show more" && l !== "Show more replies")
+				.join("\\n")
+				.trim();
 		}
-		var main = document.querySelector("main");
+
+		const main = document.querySelector("main");
 		if (!main) return null;
-		var articles = main.querySelectorAll("article");
+		const articles = main.querySelectorAll("article");
 		if (!articles.length) return null;
-		for (let a = 0; a < articles.length; a++) {
-			var article = articles[a];
-			var rect = article.getBoundingClientRect();
+
+		for (const article of articles) {
+			const rect = article.getBoundingClientRect();
 			if (rect.bottom < 0 || rect.top > window.innerHeight * 1.5) continue;
-			await expandInlineShowMore(article);
-			var rawText = article.innerText || "";
-			var fullText = cleanPostText(rawText.trim());
+
+			await expandShowMore(article);
+			const fullText = cleanText(article.innerText || "");
 			if (!fullText) continue;
-			var linkEl = article.querySelector('a[href*="/status/"]');
-			var postUrl = linkEl ? linkEl.href : null;
-			var id = postUrl || fullText.split("\\n").slice(0, 5).join(" ").slice(0, 200);
+
+			const linkEl = article.querySelector('a[href*="/status/"]');
+			const postUrl = linkEl ? linkEl.href : null;
+			const id = postUrl || fullText.split("\\n").slice(0, 5).join(" ").slice(0, 200);
 			if (!id || seen.has(id)) continue;
-			var lineParts = fullText.split("\\n");
-			var author = "Unknown";
-			if (lineParts.length >= 2) author = (lineParts[0] + " " + lineParts[1]).trim();
-			else if (lineParts.length === 1) author = lineParts[0];
-			var mediaSel = '[data-testid="tweetPhoto"] img, [data-testid="tweetImage"] img, [data-testid="attachmentImage"] img';
-			var mediaImages = article.querySelectorAll(mediaSel);
-			var images = [];
-			for (let m = 0; m < mediaImages.length; m++) {
-				var img = mediaImages[m];
-				var src = img.currentSrc || img.src;
+
+			const lines = fullText.split("\\n");
+			const author = lines.length >= 2 ? (lines[0] + " " + lines[1]).trim() : (lines[0] || "Unknown");
+
+			const mediaSel = '[data-testid="tweetPhoto"] img, [data-testid="tweetImage"] img, [data-testid="attachmentImage"] img';
+			const images = [];
+			for (const img of article.querySelectorAll(mediaSel)) {
+				const src = img.currentSrc || img.src;
 				if (!src) continue;
-				var lowerSrc = src.toLowerCase();
-				if (lowerSrc.indexOf("emoji") >= 0 || lowerSrc.indexOf("twemoji") >= 0 || lowerSrc.indexOf("icon") >= 0 || lowerSrc.indexOf("profile_images") >= 0 || lowerSrc.indexOf("profile_banners") >= 0) continue;
+				const lower = src.toLowerCase();
+				if (["emoji", "twemoji", "icon", "profile_images", "profile_banners"].some(k => lower.includes(k))) continue;
 				if (img.getAttribute("aria-hidden") === "true") continue;
-				var ir = img.getBoundingClientRect();
-				var iw = parseInt(img.getAttribute("width") || "0", 10) || ir.width;
-				var ih = parseInt(img.getAttribute("height") || "0", 10) || ir.height;
+				const ir = img.getBoundingClientRect();
+				const iw = parseInt(img.getAttribute("width") || "0", 10) || ir.width;
+				const ih = parseInt(img.getAttribute("height") || "0", 10) || ir.height;
 				if (iw > 0 && ih > 0 && (iw < 40 || ih < 40)) continue;
-				if (images.indexOf(src) === -1) images.push(src);
+				if (!images.includes(src)) images.push(src);
 			}
+
 			clearHighlight();
 			article.setAttribute(HIGHLIGHT_ATTR, "true");
 			article.style.outline = "3px solid #ff9900";
 			article.style.boxShadow = "0 0 12px rgba(255,153,0,0.8)";
 			article.style.backgroundColor = "rgba(255, 255, 0, 0.06)";
 			article.scrollIntoView({ behavior: "smooth", block: "center" });
-			return { id: id, url: postUrl, author: author, fullText: fullText, images: images };
+
+			return { id, url: postUrl, author, fullText, images };
 		}
 		return null;
 	} catch (err) {
@@ -144,62 +135,45 @@ const GET_NEXT_POST_SCRIPT = `
 `;
 
 function buildGetNextPostScript(seenIds, dynamicContentTimeout) {
-	return GET_NEXT_POST_SCRIPT.replace(
-		"SEEN_IDS_PLACEHOLDER",
-		JSON.stringify(Array.from(seenIds)),
-	).replace("DYNAMIC_PLACEHOLDER", String(dynamicContentTimeout));
+	return GET_NEXT_POST_SCRIPT
+		.replace("SEEN_IDS_PLACEHOLDER", JSON.stringify([...seenIds]))
+		.replace("DYNAMIC_PLACEHOLDER", String(dynamicContentTimeout));
 }
 
 let loginWindow = null;
 
 export class XPlatform extends PlatformBase {
-	getPlatformId() {
-		return "x";
-	}
-
-	getDisplayName() {
-		return "X";
-	}
-
-	getHomeUrl() {
-		return X_HOME;
-	}
-
-	getLoginUrl() {
-		return X_LOGIN;
-	}
-
-	getSessionPartition() {
-		return "persist:socialfeed-x";
-	}
+	getPlatformId() { return "x"; }
+	getDisplayName() { return "X"; }
+	getHomeUrl() { return X_HOME; }
+	getLoginUrl() { return X_LOGIN; }
+	getSessionPartition() { return "persist:socialfeed-x"; }
 
 	parseHandle(input) {
 		if (!input || typeof input !== "string") return null;
-		const clean = input.trim();
-		const match = clean.match(/^\/?([A-Za-z0-9_]{1,15})(?:\/)?$/);
+		const match = input.trim().match(/^\/?([A-Za-z0-9_]{1,15})\/?$/);
 		return match ? match[1] : null;
 	}
 
+	/** Read the logged-in handle from the X home page DOM. */
 	async readLoggedInHandle(win) {
 		try {
 			const handle = await win.webContents.executeJavaScript(
 				`new Promise((resolve) => {
 					let attempts = 0;
-					const maxAttempts = 20;
 					const tick = () => {
 						const profileLink =
 							document.querySelector('a[data-testid="AppTabBar_Profile_Link"]') ||
 							document.querySelector('a[aria-label*="Profile"][href]');
 						const href = profileLink?.getAttribute("href") || "";
-						const direct = href.match(/^\\/([A-Za-z0-9_]{1,15})(?:\\/)?$/);
-						if (direct) return resolve(direct[1]);
+						const m = href.match(/^\\/([A-Za-z0-9_]{1,15})\\/?$/);
+						if (m) return resolve(m[1]);
 
 						const ogTitle = document.querySelector('meta[property="og:title"]')?.content || "";
-						const titleMatch = ogTitle.match(/\\(@([A-Za-z0-9_]{1,15})\\)/);
-						if (titleMatch) return resolve(titleMatch[1]);
+						const tm = ogTitle.match(/\\(@([A-Za-z0-9_]{1,15})\\)/);
+						if (tm) return resolve(tm[1]);
 
-						attempts += 1;
-						if (attempts >= maxAttempts) return resolve(null);
+						if (++attempts >= 20) return resolve(null);
 						setTimeout(tick, 200);
 					};
 					tick();
@@ -214,7 +188,6 @@ export class XPlatform extends PlatformBase {
 
 	async openLoginWindow() {
 		return new Promise((resolve) => {
-			// Close any existing login window
 			if (loginWindow && !loginWindow.isDestroyed()) {
 				loginWindow.close();
 				loginWindow = null;
@@ -226,16 +199,10 @@ export class XPlatform extends PlatformBase {
 				height: 700,
 				show: true,
 				title: `Log in to ${this.getDisplayName()}`,
-				webPreferences: {
-					session: sess,
-					contextIsolation: true,
-					nodeIntegration: false,
-				},
+				webPreferences: { session: sess, contextIsolation: true, nodeIntegration: false },
 			});
-
 			loginWindow.setMenu(null);
-			
-			// Ensure window is visible and focused
+
 			loginWindow.once("ready-to-show", () => {
 				if (loginWindow && !loginWindow.isDestroyed()) {
 					loginWindow.show();
@@ -249,12 +216,8 @@ export class XPlatform extends PlatformBase {
 					if (success) {
 						try {
 							const username = await this.readLoggedInHandle(loginWindow);
-							if (username) {
-								setCachedSocialUsername(this.getPlatformId(), username);
-							}
-						} catch {
-							// Ignore errors when reading username
-						}
+							if (username) setCachedSocialUsername(this.getPlatformId(), username);
+						} catch {}
 					}
 					loginWindow.close();
 					loginWindow = null;
@@ -263,12 +226,11 @@ export class XPlatform extends PlatformBase {
 			};
 
 			loginWindow.on("closed", () => finish(false));
-
 			loginWindow.webContents.on("did-navigate-in-page", (_, url) => {
-				if (url && url.startsWith(X_HOME)) finish(true);
+				if (url?.startsWith(X_HOME)) finish(true);
 			});
 			loginWindow.webContents.on("did-navigate", (_, url) => {
-				if (url && url.startsWith(X_HOME)) finish(true);
+				if (url?.startsWith(X_HOME)) finish(true);
 			});
 
 			loginWindow.loadURL(X_LOGIN).catch(() => {
@@ -280,72 +242,51 @@ export class XPlatform extends PlatformBase {
 	async getAccountInfo() {
 		const cachedUsername = getCachedSocialUsername(this.getPlatformId());
 		const sess = getSocialSession(this.getPlatformId());
-		
-		// Fast path: check cookies without loading page
+
+		// Fast path: check cookies without loading a page
 		try {
-			// Check cookies for both x.com and twitter.com (X uses both domains)
 			const [xCookies, twitterCookies] = await Promise.all([
 				sess.cookies.get({ domain: "x.com" }).catch(() => []),
 				sess.cookies.get({ domain: "twitter.com" }).catch(() => []),
 			]);
-			// X.com uses various auth cookies (auth_token, ct0, twid, etc.)
-			// If we have cookies for either domain, likely logged in
-			const hasAuthCookies = xCookies.length > 0 || twitterCookies.length > 0;
-			
-			if (hasAuthCookies && cachedUsername) {
-				// Fast path: have cookies and cached username - return immediately
+			const hasAuth = xCookies.length > 0 || twitterCookies.length > 0;
+
+			if (hasAuth && cachedUsername) {
 				return { connected: true, username: cachedUsername };
 			}
-			
-			if (!hasAuthCookies) {
-				// No cookies = not logged in, clear cache
-				if (cachedUsername) {
-					setCachedSocialUsername(this.getPlatformId(), null);
-				}
+			if (!hasAuth) {
+				if (cachedUsername) setCachedSocialUsername(this.getPlatformId(), null);
 				return { connected: false, username: null };
 			}
-			
-			// Have cookies but no cached username - need to load page to get username
-		} catch (err) {
-			// Cookie check failed, fall through to page load verification
-		}
-		
-		// Slow path: load page to verify connection and get username
+		} catch {}
+
+		// Slow path: load page to verify and read username
 		return new Promise((resolve) => {
 			const win = new BrowserWindow({
 				show: false,
 				webPreferences: { session: sess, contextIsolation: true, nodeIntegration: false },
 			});
+
 			win.webContents.once("did-finish-load", async () => {
 				const url = win.webContents.getURL();
 				if (!url.startsWith(X_HOME)) {
 					win.close();
-					// Clear cached username if we're not on home page (not logged in)
-					if (cachedUsername) {
-						setCachedSocialUsername(this.getPlatformId(), null);
-					}
-					resolve({ connected: false, username: null });
-					return;
+					if (cachedUsername) setCachedSocialUsername(this.getPlatformId(), null);
+					return resolve({ connected: false, username: null });
 				}
 				const username = await this.readLoggedInHandle(win);
 				win.close();
 				if (username) {
 					setCachedSocialUsername(this.getPlatformId(), username);
-					resolve({ connected: true, username: username });
-				} else {
-					// Couldn't read username - clear cache and report as not connected
-					if (cachedUsername) {
-						setCachedSocialUsername(this.getPlatformId(), null);
-					}
-					resolve({ connected: false, username: null });
+					return resolve({ connected: true, username });
 				}
+				if (cachedUsername) setCachedSocialUsername(this.getPlatformId(), null);
+				resolve({ connected: false, username: null });
 			});
+
 			win.loadURL(X_HOME).catch(() => {
 				win.close();
-				// Clear cached username on load failure
-				if (cachedUsername) {
-					setCachedSocialUsername(this.getPlatformId(), null);
-				}
+				if (cachedUsername) setCachedSocialUsername(this.getPlatformId(), null);
 				resolve({ connected: false, username: null });
 			});
 		});
@@ -364,145 +305,70 @@ export class XPlatform extends PlatformBase {
 
 	async scrollFeed(options = {}) {
 		const maxPosts = options.maxPosts ?? 100;
-		console.log(SCROLLER_LOG_PREFIX, `Starting scrollFeed for ${this.getDisplayName()}`, {
-			maxPosts,
-			url: X_HOME,
-		});
+		devLog("[scroller] Starting scroll for", this.getDisplayName());
 
 		const sess = getSocialSession(this.getPlatformId());
 		const win = new BrowserWindow({
 			show: false,
 			width: 1280,
 			height: 720,
-			webPreferences: {
-				session: sess,
-				contextIsolation: true,
-				nodeIntegration: false,
-			},
+			webPreferences: { session: sess, contextIsolation: true, nodeIntegration: false },
 		});
 
 		try {
-			console.log(SCROLLER_LOG_PREFIX, `Loading ${this.getDisplayName()} home...`);
 			await win.loadURL(X_HOME, { timeout: NAVIGATION_TIMEOUT_MS });
-			console.log(SCROLLER_LOG_PREFIX, "Page loaded.");
 		} catch (err) {
 			win.destroy();
-			console.error(SCROLLER_LOG_PREFIX, "Load failed:", err?.message);
-			throw new Error(`Failed to load ${this.getDisplayName()} home: ${err.message || "timeout"}`);
+			throw new Error(`Failed to load ${this.getDisplayName()} home: ${err?.message || "timeout"}`);
 		}
 
-		console.log(SCROLLER_LOG_PREFIX, "Waiting 3s for timeline to hydrate...");
+		// Wait for timeline to hydrate
 		await new Promise((r) => setTimeout(r, 3000));
+		const wc = win.webContents;
 
-		const webContents = win.webContents;
-
+		// Run diagnostic to check feed state
 		try {
-			let diag = await webContents.executeJavaScript(PAGE_DIAGNOSTIC_SCRIPT);
-			console.log(
-				SCROLLER_LOG_PREFIX,
-				"Page diagnostic (after 3s):",
-				JSON.stringify(diag, null, 2),
-			);
-			if (!diag.hasMain) {
-				console.warn(
-					SCROLLER_LOG_PREFIX,
-					`No <main> found – ${this.getDisplayName()} DOM may have changed or page not fully loaded.`,
-				);
-			}
+			let diag = await wc.executeJavaScript(PAGE_DIAGNOSTIC_SCRIPT);
 			if (diag.articleCount === 0) {
-				console.warn(
-					SCROLLER_LOG_PREFIX,
-					"Zero articles in main – waiting 5s and re-checking (feed may load late)...",
-				);
+				devWarn("[scroller] Zero articles after 3s, waiting 5s more…");
 				await new Promise((r) => setTimeout(r, 5000));
-				diag = await webContents.executeJavaScript(PAGE_DIAGNOSTIC_SCRIPT);
-				console.log(
-					SCROLLER_LOG_PREFIX,
-					"Page diagnostic (after +5s):",
-					JSON.stringify(diag, null, 2),
-				);
+				diag = await wc.executeJavaScript(PAGE_DIAGNOSTIC_SCRIPT);
 				if (diag.articleCount === 0) {
-					console.warn(
-						SCROLLER_LOG_PREFIX,
-						`Still zero articles – feed empty or ${this.getDisplayName()} DOM/selectors changed.`,
-					);
+					devWarn("[scroller] Still zero articles – feed may be empty or DOM changed.");
 				}
 			}
-		} catch (diagErr) {
-			console.warn(
-				SCROLLER_LOG_PREFIX,
-				"Diagnostic script failed:",
-				diagErr?.message,
-			);
-		}
+		} catch {}
 
 		const seenIds = new Set();
 		const posts = [];
 		let consecutiveMisses = 0;
 		let iteration = 0;
-		const onProgress = options.onProgress;
+		const { onProgress } = options;
 		if (typeof onProgress === "function") onProgress(0, maxPosts);
 
 		while (posts.length < maxPosts && consecutiveMisses < 10) {
 			iteration++;
-			const script = buildGetNextPostScript(seenIds, DYNAMIC_CONTENT_DELAY_MS);
 			let next;
 			try {
-				next = await webContents.executeJavaScript(script);
-			} catch (err) {
+				next = await wc.executeJavaScript(buildGetNextPostScript(seenIds, DYNAMIC_CONTENT_DELAY_MS));
+			} catch {
 				consecutiveMisses++;
-				console.log(
-					SCROLLER_LOG_PREFIX,
-					"Iteration",
-					iteration,
-					"executeJavaScript error:",
-					err?.message,
-					"| posts:",
-					posts.length,
-					"consecutiveMisses:",
-					consecutiveMisses,
-				);
-				await webContents.executeJavaScript(
-					"window.scrollBy(0, window.innerHeight * 0.9);",
-				);
+				await wc.executeJavaScript("window.scrollBy(0, window.innerHeight * 0.9);");
 				await new Promise((r) => setTimeout(r, SCROLL_DISCOVERY_DELAY_MS));
 				continue;
 			}
 
-			if (next && next.__error) {
+			if (next?.__error) {
 				consecutiveMisses++;
-				console.error(
-					SCROLLER_LOG_PREFIX,
-					"Iteration",
-					iteration,
-					"page script threw:",
-					next.__error,
-				);
-				if (next.__stack)
-					console.error(SCROLLER_LOG_PREFIX, "stack:", next.__stack.slice(0, 500));
-				await webContents.executeJavaScript(
-					"window.scrollBy(0, window.innerHeight * 0.9);",
-				);
+				devWarn("[scroller] Page script error:", next.__error);
+				await wc.executeJavaScript("window.scrollBy(0, window.innerHeight * 0.9);");
 				await new Promise((r) => setTimeout(r, SCROLL_DISCOVERY_DELAY_MS));
 				continue;
 			}
 
 			if (!next) {
 				consecutiveMisses++;
-				if (iteration <= 3 || consecutiveMisses <= 2 || iteration % 5 === 0) {
-					console.log(
-						SCROLLER_LOG_PREFIX,
-						"Iteration",
-						iteration,
-						"no post returned (scroll to discover) | posts:",
-						posts.length,
-						"consecutiveMisses:",
-						consecutiveMisses,
-					);
-				}
-				await webContents.executeJavaScript(
-					"window.scrollBy(0, window.innerHeight * 0.9);",
-				);
+				await wc.executeJavaScript("window.scrollBy(0, window.innerHeight * 0.9);");
 				await new Promise((r) => setTimeout(r, SCROLL_DISCOVERY_DELAY_MS));
 				continue;
 			}
@@ -516,34 +382,13 @@ export class XPlatform extends PlatformBase {
 				images: Array.isArray(next.images) ? next.images : [],
 			});
 			if (typeof onProgress === "function") onProgress(posts.length, maxPosts);
-			if (posts.length <= 3 || posts.length % 10 === 0) {
-				console.log(
-					SCROLLER_LOG_PREFIX,
-					"Iteration",
-					iteration,
-					"collected post",
-					posts.length,
-					"| url:",
-					(next.url || "").slice(0, 60) +
-						(next.url && next.url.length > 60 ? "..." : ""),
-				);
-			}
 
-			await new Promise((r) => setTimeout(r, TWEET_PROCESSING_DELAY_MS));
-			await webContents.executeJavaScript(
-				"window.scrollBy(0, window.innerHeight * 0.7);",
-			);
-			await new Promise((r) => setTimeout(r, TWEET_PROCESSING_DELAY_MS));
+			await new Promise((r) => setTimeout(r, POST_PROCESSING_DELAY_MS));
+			await wc.executeJavaScript("window.scrollBy(0, window.innerHeight * 0.7);");
+			await new Promise((r) => setTimeout(r, POST_PROCESSING_DELAY_MS));
 		}
 
-		const exitReason =
-			posts.length >= maxPosts ? "maxPosts" : "10 consecutive misses";
-		console.log(SCROLLER_LOG_PREFIX, "Scroll finished:", {
-			postsCount: posts.length,
-			exitReason,
-			iterations: iteration,
-		});
-
+		devLog("[scroller] Finished:", posts.length, "posts in", iteration, "iterations");
 		win.destroy();
 		return posts;
 	}

@@ -1,5 +1,6 @@
 /**
- * Login window: email + PIN only. After login, notifies main to close window; tray popup is used when logged in.
+ * Login window: email + PIN authentication flow.
+ * After login, notifies main process to close this window.
  */
 (function () {
 	const emailInput = document.getElementById("email");
@@ -10,13 +11,13 @@
 	const verifyPinBtn = document.getElementById("verifyPin");
 	const authError = document.getElementById("authError");
 	const authSuccess = document.getElementById("authSuccess");
-	const loginForm = document.getElementById("loginForm");
 
 	function showError(msg) {
 		authError.textContent = msg || "";
 		authError.classList.toggle("hidden", !msg);
 		authSuccess.classList.add("hidden");
 	}
+
 	function showSuccess(msg) {
 		authSuccess.textContent = msg || "";
 		authSuccess.classList.toggle("hidden", !msg);
@@ -27,39 +28,26 @@
 		if (!window.unfeed) return;
 		const token = await window.unfeed.getJwt();
 		if (token) {
-			// Already logged in; tell main to close this window (user will use tray popup)
-			try {
-				if (window.unfeed.loginComplete) {
-					await window.unfeed.loginComplete();
-				}
-			} catch (e) {
-				console.error("Error closing login window:", e);
-			}
-			return;
+			try { await window.unfeed.loginComplete?.(); } catch {}
 		}
 	}
 
 	async function requestPin() {
 		if (requestPinBtn) {
-			requestPinBtn.textContent = "Sending...";
+			requestPinBtn.textContent = "Sending…";
 			requestPinBtn.disabled = true;
-		}
-		if (authSuccess) {
-			authSuccess.textContent = "Requesting code...";
-			authSuccess.classList.remove("hidden");
-			authError.classList.add("hidden");
 		}
 
 		const email = emailInput?.value?.trim();
 		if (!email) {
-			if (authError) authError.textContent = "Enter your email.";
-			if (authError) authError.classList.remove("hidden");
+			showError("Enter your email.");
 			if (requestPinBtn) {
 				requestPinBtn.textContent = "Send login code";
 				requestPinBtn.disabled = false;
 			}
 			return;
 		}
+
 		try {
 			if (!window.unfeed?.requestPin) {
 				showError("App not ready. Restart the app.");
@@ -102,15 +90,8 @@
 			if (result?.ok && result?.token) {
 				await window.unfeed.setJwt(result.token);
 				showSuccess("Logged in. Closing…");
-				// Small delay to show the success message, then close
 				setTimeout(async () => {
-					try {
-						if (window.unfeed?.loginComplete) {
-							await window.unfeed.loginComplete();
-						}
-					} catch (e) {
-						console.error("Error closing login window:", e);
-					}
+					try { await window.unfeed.loginComplete?.(); } catch {}
 				}, 500);
 			} else {
 				showError(result?.error || "Invalid or expired code.");
@@ -138,10 +119,10 @@
 		try {
 			el.textContent = "API: " + (await window.unfeed.getApiBase());
 		} catch {
-			el.textContent = "API: (could not load)";
+			el.textContent = "";
 		}
 	}
-	showApiBase();
 
+	showApiBase();
 	checkExistingAuth();
 })();
