@@ -3,7 +3,10 @@
  */
 import { ipcMain, session } from "electron";
 import * as store from "./store.js";
-import { uploadPosts as apiUploadPosts, getSocialFeedStatus as apiGetSocialFeedStatus } from "./api-client.js";
+import {
+	uploadPosts as apiUploadPosts,
+	getSocialFeedStatus as apiGetSocialFeedStatus,
+} from "./api-client.js";
 import { devLog } from "./log.js";
 
 export function registerIpcHandlers() {
@@ -16,8 +19,12 @@ export function registerIpcHandlers() {
 	ipcMain.handle("setJwt", (_, token) => store.setJwt(token));
 
 	// Store: settings
-	ipcMain.handle("getScrollIntervalHours", () => store.getScrollIntervalHours());
-	ipcMain.handle("setScrollIntervalHours", (_, hours) => store.setScrollIntervalHours(hours));
+	ipcMain.handle("getScrollIntervalHours", () =>
+		store.getScrollIntervalHours(),
+	);
+	ipcMain.handle("setScrollIntervalHours", (_, hours) =>
+		store.setScrollIntervalHours(hours),
+	);
 	ipcMain.handle("getOpenAtLogin", () => store.getOpenAtLogin());
 	ipcMain.handle("setOpenAtLogin", (_, value) => store.setOpenAtLogin(value));
 
@@ -31,11 +38,15 @@ export function registerIpcHandlers() {
 	ipcMain.handle("openSocialLogin", async (_, platformId = "x") => {
 		try {
 			const platform = await getPlatformInstance(platformId);
-			if (!platform) return { ok: false, error: `Platform not found: ${platformId}` };
+			if (!platform)
+				return { ok: false, error: `Platform not found: ${platformId}` };
 			const success = await platform.openLoginWindow();
 			return { ok: success };
 		} catch (error) {
-			return { ok: false, error: error?.message || "Failed to open login window" };
+			return {
+				ok: false,
+				error: error?.message || "Failed to open login window",
+			};
 		}
 	});
 
@@ -74,7 +85,9 @@ export function registerIpcHandlers() {
 
 			for (const id of platformIds) {
 				try {
-					const sess = session.fromPartition(`persist:socialfeed-${id}`, { cache: true });
+					const sess = session.fromPartition(`persist:socialfeed-${id}`, {
+						cache: true,
+					});
 					await sess.clearStorageData();
 					await sess.clearCache();
 				} catch {}
@@ -88,7 +101,9 @@ export function registerIpcHandlers() {
 
 	// API proxies
 	ipcMain.handle("getSocialFeedStatus", () => apiGetSocialFeedStatus());
-	ipcMain.handle("uploadPosts", (_, posts, platformId) => apiUploadPosts(posts || [], platformId));
+	ipcMain.handle("uploadPosts", (_, posts, platformId) =>
+		apiUploadPosts(posts || [], platformId),
+	);
 
 	// Auth: main process handles HTTP to avoid renderer CORS issues
 	ipcMain.handle("requestPin", async (_, email) => {
@@ -100,7 +115,9 @@ export function registerIpcHandlers() {
 				body: JSON.stringify({ email }),
 			});
 			const data = await res.json().catch(() => ({}));
-			return res.ok ? { ok: true } : { ok: false, error: data.error || res.statusText };
+			return res.ok
+				? { ok: true }
+				: { ok: false, error: data.error || res.statusText };
 		} catch (e) {
 			return { ok: false, error: e?.message || "Network error" };
 		}
@@ -132,7 +149,12 @@ export function registerIpcHandlers() {
 		};
 		const result = await attemptScrollWithBackendCheck({ onProgress });
 		if (result.skipped) {
-			return { ok: false, saved: 0, total: 0, error: result.reason ?? "Scroll skipped" };
+			return {
+				ok: false,
+				saved: 0,
+				total: 0,
+				error: result.reason ?? "Scroll skipped",
+			};
 		}
 		return {
 			ok: !result.error,

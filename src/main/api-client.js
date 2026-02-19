@@ -79,8 +79,16 @@ export async function uploadPosts(posts, platformId) {
 			});
 			const data = await res.json().catch(() => ({}));
 			if (!res.ok) {
-				devWarn("[api] upload failed:", res.status, data.error || res.statusText);
-				return { saved: totalSaved, total: count, error: data.error || res.statusText };
+				devWarn(
+					"[api] upload failed:",
+					res.status,
+					data.error || res.statusText,
+				);
+				return {
+					saved: totalSaved,
+					total: count,
+					error: data.error || res.statusText,
+				};
 			}
 			totalSaved += data.saved ?? 0;
 		}
@@ -106,11 +114,22 @@ export async function canStartScroll() {
 		});
 		const data = await res.json().catch(() => ({}));
 		if (!res.ok) {
-			return { allowed: false, nextAllowedAt: null, error: data.error || res.statusText };
+			return {
+				allowed: false,
+				nextAllowedAt: null,
+				error: data.error || res.statusText,
+			};
 		}
-		return { allowed: data.allowed === true, nextAllowedAt: data.nextAllowedAt ?? null };
+		return {
+			allowed: data.allowed === true,
+			nextAllowedAt: data.nextAllowedAt ?? null,
+		};
 	} catch (err) {
-		return { allowed: false, nextAllowedAt: null, error: err?.message || "Network error" };
+		return {
+			allowed: false,
+			nextAllowedAt: null,
+			error: err?.message || "Network error",
+		};
 	}
 }
 
@@ -130,7 +149,12 @@ export async function getSocialFeedStatus() {
 		});
 		const data = await res.json().catch(() => ({}));
 		if (!res.ok) {
-			return { connected: true, lastUploadAt: null, postCountLast24h: 0, error: data.error || res.statusText };
+			return {
+				connected: true,
+				lastUploadAt: null,
+				postCountLast24h: 0,
+				error: data.error || res.statusText,
+			};
 		}
 		return {
 			connected: data.connected !== false,
@@ -138,6 +162,11 @@ export async function getSocialFeedStatus() {
 			postCountLast24h: data.postCountLast24h ?? 0,
 		};
 	} catch (err) {
-		return { connected: true, lastUploadAt: null, postCountLast24h: 0, error: err?.message || "Network error" };
+		return {
+			connected: true,
+			lastUploadAt: null,
+			postCountLast24h: 0,
+			error: err?.message || "Network error",
+		};
 	}
 }

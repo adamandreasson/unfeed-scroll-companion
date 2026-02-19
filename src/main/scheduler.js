@@ -25,7 +25,10 @@ async function executeScroll(opts = {}) {
 	scrollInProgress = true;
 	try {
 		devLog("[scheduler] Starting scroll…");
-		const posts = await scrollSocialFeed({ maxPosts: 100, onProgress: opts.onProgress });
+		const posts = await scrollSocialFeed({
+			maxPosts: 100,
+			onProgress: opts.onProgress,
+		});
 		devLog("[scheduler] Scroll finished, posts:", posts?.length ?? 0);
 
 		if (posts.length === 0) {
@@ -48,7 +51,8 @@ async function executeScroll(opts = {}) {
  * @returns {Promise<{ skipped?: boolean, reason?: string, saved?: number, total?: number, error?: string }>}
  */
 export async function attemptScrollWithBackendCheck(opts = {}) {
-	if (scrollInProgress) return { skipped: true, reason: "Scroll already in progress" };
+	if (scrollInProgress)
+		return { skipped: true, reason: "Scroll already in progress" };
 	if (!getJwt()) return { skipped: true, reason: "Not logged in" };
 
 	try {

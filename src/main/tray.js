@@ -1,5 +1,5 @@
 /**
- * System tray setup for the Unfeed client.
+ * System tray setup for Scroll Companion.
  */
 import { app, Tray, Menu, nativeImage } from "electron";
 import path from "path";
@@ -62,7 +62,7 @@ function getTrayIcon() {
 export function createTray(onTrayClick) {
 	const icon = getTrayIcon();
 	tray = new Tray(icon);
-	tray.setToolTip("Unfeed Social Scroller");
+	tray.setToolTip("Scroll Companion");
 
 	tray.on("click", () => {
 		if (typeof onTrayClick === "function") onTrayClick();
@@ -73,7 +73,10 @@ export function createTray(onTrayClick) {
 	tray.on("right-click", () => {
 		if (!tray || tray.isDestroyed()) return;
 		const contextMenu = Menu.buildFromTemplate([
-			{ label: "Show Unfeed", click: () => typeof onTrayClick === "function" && onTrayClick() },
+			{
+				label: "Show Scroll Companion",
+				click: () => typeof onTrayClick === "function" && onTrayClick(),
+			},
 			{ type: "separator" },
 			{ label: "Quit", role: "quit" },
 		]);

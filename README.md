@@ -1,4 +1,4 @@
-# Unfeed Social Scroller
+# Scroll Companion
 
 Open-source Electron desktop client for [unfeed.ai](https://unfeed.ai). Runs in the system tray and periodically scrolls your social media feeds, uploading posts to Unfeed so they appear in your personalized daily newspaper.
 

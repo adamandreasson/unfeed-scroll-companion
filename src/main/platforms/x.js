@@ -135,19 +135,30 @@ const GET_NEXT_POST_SCRIPT = `
 `;
 
 function buildGetNextPostScript(seenIds, dynamicContentTimeout) {
-	return GET_NEXT_POST_SCRIPT
-		.replace("SEEN_IDS_PLACEHOLDER", JSON.stringify([...seenIds]))
-		.replace("DYNAMIC_PLACEHOLDER", String(dynamicContentTimeout));
+	return GET_NEXT_POST_SCRIPT.replace(
+		"SEEN_IDS_PLACEHOLDER",
+		JSON.stringify([...seenIds]),
+	).replace("DYNAMIC_PLACEHOLDER", String(dynamicContentTimeout));
 }
 
 let loginWindow = null;
 
 export class XPlatform extends PlatformBase {
-	getPlatformId() { return "x"; }
-	getDisplayName() { return "X"; }
-	getHomeUrl() { return X_HOME; }
-	getLoginUrl() { return X_LOGIN; }
-	getSessionPartition() { return "persist:socialfeed-x"; }
+	getPlatformId() {
+		return "x";
+	}
+	getDisplayName() {
+		return "X";
+	}
+	getHomeUrl() {
+		return X_HOME;
+	}
+	getLoginUrl() {
+		return X_LOGIN;
+	}
+	getSessionPartition() {
+		return "persist:socialfeed-x";
+	}
 
 	parseHandle(input) {
 		if (!input || typeof input !== "string") return null;
@@ -199,7 +210,11 @@ export class XPlatform extends PlatformBase {
 				height: 700,
 				show: true,
 				title: `Log in to ${this.getDisplayName()}`,
-				webPreferences: { session: sess, contextIsolation: true, nodeIntegration: false },
+				webPreferences: {
+					session: sess,
+					contextIsolation: true,
+					nodeIntegration: false,
+				},
 			});
 			loginWindow.setMenu(null);
 
@@ -216,7 +231,8 @@ export class XPlatform extends PlatformBase {
 					if (success) {
 						try {
 							const username = await this.readLoggedInHandle(loginWindow);
-							if (username) setCachedSocialUsername(this.getPlatformId(), username);
+							if (username)
+								setCachedSocialUsername(this.getPlatformId(), username);
 						} catch {}
 					}
 					loginWindow.close();
@@ -264,14 +280,19 @@ export class XPlatform extends PlatformBase {
 		return new Promise((resolve) => {
 			const win = new BrowserWindow({
 				show: false,
-				webPreferences: { session: sess, contextIsolation: true, nodeIntegration: false },
+				webPreferences: {
+					session: sess,
+					contextIsolation: true,
+					nodeIntegration: false,
+				},
 			});
 
 			win.webContents.once("did-finish-load", async () => {
 				const url = win.webContents.getURL();
 				if (!url.startsWith(X_HOME)) {
 					win.close();
-					if (cachedUsername) setCachedSocialUsername(this.getPlatformId(), null);
+					if (cachedUsername)
+						setCachedSocialUsername(this.getPlatformId(), null);
 					return resolve({ connected: false, username: null });
 				}
 				const username = await this.readLoggedInHandle(win);
@@ -312,14 +333,20 @@ export class XPlatform extends PlatformBase {
 			show: false,
 			width: 1280,
 			height: 720,
-			webPreferences: { session: sess, contextIsolation: true, nodeIntegration: false },
+			webPreferences: {
+				session: sess,
+				contextIsolation: true,
+				nodeIntegration: false,
+			},
 		});
 
 		try {
 			await win.loadURL(X_HOME, { timeout: NAVIGATION_TIMEOUT_MS });
 		} catch (err) {
 			win.destroy();
-			throw new Error(`Failed to load ${this.getDisplayName()} home: ${err?.message || "timeout"}`);
+			throw new Error(
+				`Failed to load ${this.getDisplayName()} home: ${err?.message || "timeout"}`,
+			);
 		}
 
 		// Wait for timeline to hydrate
@@ -334,7 +361,9 @@ export class XPlatform extends PlatformBase {
 				await new Promise((r) => setTimeout(r, 5000));
 				diag = await wc.executeJavaScript(PAGE_DIAGNOSTIC_SCRIPT);
 				if (diag.articleCount === 0) {
-					devWarn("[scroller] Still zero articles – feed may be empty or DOM changed.");
+					devWarn(
+						"[scroller] Still zero articles – feed may be empty or DOM changed.",
+					);
 				}
 			}
 		} catch {}
@@ -350,10 +379,14 @@ export class XPlatform extends PlatformBase {
 			iteration++;
 			let next;
 			try {
-				next = await wc.executeJavaScript(buildGetNextPostScript(seenIds, DYNAMIC_CONTENT_DELAY_MS));
+				next = await wc.executeJavaScript(
+					buildGetNextPostScript(seenIds, DYNAMIC_CONTENT_DELAY_MS),
+				);
 			} catch {
 				consecutiveMisses++;
-				await wc.executeJavaScript("window.scrollBy(0, window.innerHeight * 0.9);");
+				await wc.executeJavaScript(
+					"window.scrollBy(0, window.innerHeight * 0.9);",
+				);
 				await new Promise((r) => setTimeout(r, SCROLL_DISCOVERY_DELAY_MS));
 				continue;
 			}
@@ -361,14 +394,18 @@ export class XPlatform extends PlatformBase {
 			if (next?.__error) {
 				consecutiveMisses++;
 				devWarn("[scroller] Page script error:", next.__error);
-				await wc.executeJavaScript("window.scrollBy(0, window.innerHeight * 0.9);");
+				await wc.executeJavaScript(
+					"window.scrollBy(0, window.innerHeight * 0.9);",
+				);
 				await new Promise((r) => setTimeout(r, SCROLL_DISCOVERY_DELAY_MS));
 				continue;
 			}
 
 			if (!next) {
 				consecutiveMisses++;
-				await wc.executeJavaScript("window.scrollBy(0, window.innerHeight * 0.9);");
+				await wc.executeJavaScript(
+					"window.scrollBy(0, window.innerHeight * 0.9);",
+				);
 				await new Promise((r) => setTimeout(r, SCROLL_DISCOVERY_DELAY_MS));
 				continue;
 			}
@@ -384,11 +421,19 @@ export class XPlatform extends PlatformBase {
 			if (typeof onProgress === "function") onProgress(posts.length, maxPosts);
 
 			await new Promise((r) => setTimeout(r, POST_PROCESSING_DELAY_MS));
-			await wc.executeJavaScript("window.scrollBy(0, window.innerHeight * 0.7);");
+			await wc.executeJavaScript(
+				"window.scrollBy(0, window.innerHeight * 0.7);",
+			);
 			await new Promise((r) => setTimeout(r, POST_PROCESSING_DELAY_MS));
 		}
 
-		devLog("[scroller] Finished:", posts.length, "posts in", iteration, "iterations");
+		devLog(
+			"[scroller] Finished:",
+			posts.length,
+			"posts in",
+			iteration,
+			"iterations",
+		);
 		win.destroy();
 		return posts;
 	}

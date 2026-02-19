@@ -5,7 +5,7 @@
 import Store from "electron-store";
 import { safeStorage } from "electron";
 
-const store = new Store({ name: "unfeed-client" });
+const store = new Store({ name: "scroll-companion" });
 
 const JWT_KEY = "jwt";
 const JWT_ENCRYPTED_KEY = "jwt_encrypted";
@@ -43,7 +43,10 @@ export function setJwt(token) {
 	}
 	if (useEncryption()) {
 		try {
-			store.set(JWT_ENCRYPTED_KEY, safeStorage.encryptString(token).toString("base64"));
+			store.set(
+				JWT_ENCRYPTED_KEY,
+				safeStorage.encryptString(token).toString("base64"),
+			);
 			store.delete(JWT_KEY);
 		} catch {
 			store.set(JWT_KEY, token);
@@ -60,7 +63,8 @@ export function getApiBase() {
 
 /** @returns {number} Clamped between 2–24 hours. */
 export function getScrollIntervalHours() {
-	const v = store.get(SCROLL_INTERVAL_HOURS_KEY) ?? DEFAULT_SCROLL_INTERVAL_HOURS;
+	const v =
+		store.get(SCROLL_INTERVAL_HOURS_KEY) ?? DEFAULT_SCROLL_INTERVAL_HOURS;
 	return Math.max(2, Math.min(24, v));
 }
 

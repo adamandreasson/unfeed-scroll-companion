@@ -22,15 +22,20 @@ contextBridge.exposeInMainWorld("unfeed", {
 
 	// Settings
 	getScrollIntervalHours: () => ipcRenderer.invoke("getScrollIntervalHours"),
-	setScrollIntervalHours: (hours) => ipcRenderer.invoke("setScrollIntervalHours", hours),
+	setScrollIntervalHours: (hours) =>
+		ipcRenderer.invoke("setScrollIntervalHours", hours),
 	getOpenAtLogin: () => ipcRenderer.invoke("getOpenAtLogin"),
 	setOpenAtLogin: (value) => ipcRenderer.invoke("setOpenAtLogin", value),
 
 	// Social accounts
-	openSocialLogin: (platformId = "x") => ipcRenderer.invoke("openSocialLogin", platformId),
-	checkSocialSession: (platformId = "x") => ipcRenderer.invoke("checkSocialSession", platformId),
-	getSocialAccountInfo: (platformId = "x") => ipcRenderer.invoke("getSocialAccountInfo", platformId),
-	clearSocialSession: (platformId = "x") => ipcRenderer.invoke("clearSocialSession", platformId),
+	openSocialLogin: (platformId = "x") =>
+		ipcRenderer.invoke("openSocialLogin", platformId),
+	checkSocialSession: (platformId = "x") =>
+		ipcRenderer.invoke("checkSocialSession", platformId),
+	getSocialAccountInfo: (platformId = "x") =>
+		ipcRenderer.invoke("getSocialAccountInfo", platformId),
+	clearSocialSession: (platformId = "x") =>
+		ipcRenderer.invoke("clearSocialSession", platformId),
 	clearAllSocialSessions: () => ipcRenderer.invoke("clearAllSocialSessions"),
 
 	// Feed

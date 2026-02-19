@@ -28,7 +28,9 @@
 		if (!window.unfeed) return;
 		const token = await window.unfeed.getJwt();
 		if (token) {
-			try { await window.unfeed.loginComplete?.(); } catch {}
+			try {
+				await window.unfeed.loginComplete?.();
+			} catch {}
 		}
 	}
 
@@ -91,7 +93,9 @@
 				await window.unfeed.setJwt(result.token);
 				showSuccess("Logged in. Closing…");
 				setTimeout(async () => {
-					try { await window.unfeed.loginComplete?.(); } catch {}
+					try {
+						await window.unfeed.loginComplete?.();
+					} catch {}
 				}, 500);
 			} else {
 				showError(result?.error || "Invalid or expired code.");

@@ -16,7 +16,9 @@ export class PlatformBase {
 	 * @returns {string}
 	 */
 	getDisplayName() {
-		throw new Error("getDisplayName() must be implemented by platform subclass");
+		throw new Error(
+			"getDisplayName() must be implemented by platform subclass",
+		);
 	}
 
 	/**
@@ -40,7 +42,9 @@ export class PlatformBase {
 	 * @returns {string}
 	 */
 	getSessionPartition() {
-		throw new Error("getSessionPartition() must be implemented by platform subclass");
+		throw new Error(
+			"getSessionPartition() must be implemented by platform subclass",
+		);
 	}
 
 	/**
@@ -57,7 +61,9 @@ export class PlatformBase {
 	 * @returns {Promise<{ connected: boolean, username: string | null }>}
 	 */
 	async getAccountInfo() {
-		throw new Error("getAccountInfo() must be implemented by platform subclass");
+		throw new Error(
+			"getAccountInfo() must be implemented by platform subclass",
+		);
 	}
 
 	/**
@@ -65,7 +71,9 @@ export class PlatformBase {
 	 * @returns {Promise<boolean>} Resolves to true if login successful, false otherwise
 	 */
 	async openLoginWindow() {
-		throw new Error("openLoginWindow() must be implemented by platform subclass");
+		throw new Error(
+			"openLoginWindow() must be implemented by platform subclass",
+		);
 	}
 
 	/**

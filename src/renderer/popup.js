@@ -59,7 +59,8 @@
 		if (!lastScrollTime || !window.unfeed?.getSocialFeedStatus) return;
 		try {
 			const s = await window.unfeed.getSocialFeedStatus();
-			lastScrollTime.textContent = (!s.error && s.lastUploadAt) ? formatTimeAgo(s.lastUploadAt) : "";
+			lastScrollTime.textContent =
+				!s.error && s.lastUploadAt ? formatTimeAgo(s.lastUploadAt) : "";
 		} catch {
 			lastScrollTime.textContent = "";
 		}
@@ -89,7 +90,9 @@
 			const ok = !!info?.connected;
 			platformConnected = ok;
 			platformAccountInfo.textContent = ok
-				? (info?.username ? `@${info.username}` : "Connected")
+				? info?.username
+					? `@${info.username}`
+					: "Connected"
 				: "Not connected";
 			connectPlatformBtn.textContent = ok ? "Sign out" : "Connect";
 			if (scrollBtn) scrollBtn.disabled = !ok;
@@ -111,7 +114,11 @@
 			}
 			const payload = decodeJwtPayload(token);
 			unfeedAccountInfo.textContent = String(
-				payload?.email || payload?.username || payload?.name || payload?.sub || "Logged in",
+				payload?.email ||
+					payload?.username ||
+					payload?.name ||
+					payload?.sub ||
+					"Logged in",
 			);
 		} catch {
 			unfeedAccountInfo.textContent = "Logged in";
@@ -142,14 +149,16 @@
 
 	// Event listeners
 	openAtLoginCheck?.addEventListener("change", async () => {
-		if (window.unfeed?.setOpenAtLogin) await window.unfeed.setOpenAtLogin(openAtLoginCheck.checked);
+		if (window.unfeed?.setOpenAtLogin)
+			await window.unfeed.setOpenAtLogin(openAtLoginCheck.checked);
 	});
 
 	connectPlatformBtn?.addEventListener("click", async () => {
 		connectPlatformBtn.disabled = true;
 		try {
 			if (platformConnected) {
-				if (window.unfeed?.clearSocialSession) await window.unfeed.clearSocialSession(platformId);
+				if (window.unfeed?.clearSocialSession)
+					await window.unfeed.clearSocialSession(platformId);
 			} else {
 				if (!window.unfeed?.openSocialLogin) {
 					showFeedStatus("Error: Login function not available");
@@ -157,7 +166,9 @@
 				}
 				const result = await window.unfeed.openSocialLogin(platformId);
 				if (result && !result.ok) {
-					showFeedStatus("Error: " + (result.error || "Failed to open login window"));
+					showFeedStatus(
+						"Error: " + (result.error || "Failed to open login window"),
+					);
 				}
 			}
 			await refreshPlatformLabel();
@@ -172,7 +183,8 @@
 		if (!scrollRow || !scrollText || !scrollFill) return;
 		scrollRow.style.display = "flex";
 		scrollText.textContent = collected + " / " + max;
-		scrollFill.style.width = (max > 0 ? Math.min(100, Math.round((collected / max) * 100)) : 0) + "%";
+		scrollFill.style.width =
+			(max > 0 ? Math.min(100, Math.round((collected / max) * 100)) : 0) + "%";
 	}
 
 	function hideScrollProgress() {
@@ -201,7 +213,8 @@
 		if (!window.unfeed?.setJwt) return;
 		logoutBtn.disabled = true;
 		try {
-			if (window.unfeed?.clearAllSocialSessions) await window.unfeed.clearAllSocialSessions();
+			if (window.unfeed?.clearAllSocialSessions)
+				await window.unfeed.clearAllSocialSessions();
 			await window.unfeed.setJwt(null);
 			if (unfeedAccountInfo) unfeedAccountInfo.textContent = "Not logged in";
 			await refreshPlatformLabel();

@@ -1,5 +1,5 @@
 /**
- * Unfeed client – Electron main process.
+ * Scroll Companion – Electron main process.
  * System tray app: scrolls social media feeds and uploads them to unfeed.ai.
  */
 import path from "path";
@@ -10,7 +10,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, "..", "..", ".env") });
 
 import { app, BrowserWindow, session, ipcMain } from "electron";
-import { createTray, updateTrayMenu, destroyTray, getTrayBounds } from "./tray.js";
+import {
+	createTray,
+	updateTrayMenu,
+	destroyTray,
+	getTrayBounds,
+} from "./tray.js";
 import { getOpenAtLogin, getApiBase, getJwt } from "./store.js";
 import { registerIpcHandlers } from "./ipc-handlers.js";
 import { startScheduler } from "./scheduler.js";
@@ -55,7 +60,7 @@ function createLoginWindow() {
 			nodeIntegration: false,
 			webSecurity: !isDev,
 		},
-		title: "Unfeed – Log in",
+		title: "Scroll Companion – Log in",
 	});
 	loginWindow.on("closed", () => {
 		loginWindow = null;
@@ -85,7 +90,7 @@ function createPopupWindow() {
 			nodeIntegration: false,
 			webSecurity: !isDev,
 		},
-		title: "Unfeed",
+		title: "Scroll Companion",
 	});
 	popupWindow.on("closed", () => {
 		popupWindow = null;
@@ -181,7 +186,9 @@ app.on("before-quit", () => {
  * @returns {Electron.Session}
  */
 export function getSocialSession(platformId) {
-	return session.fromPartition(`persist:socialfeed-${platformId}`, { cache: true });
+	return session.fromPartition(`persist:socialfeed-${platformId}`, {
+		cache: true,
+	});
 }
 
 /**
