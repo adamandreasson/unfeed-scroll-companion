@@ -2,6 +2,7 @@
 module.exports = {
   packagerConfig: {
     asar: true,
+    icon: "./assets/icon",
     ...(process.platform === "darwin" && {
       osxSign: {
         // Use the keychain created in CI (Import step); osx-sign looks up "Developer ID Application:" there
@@ -24,9 +25,9 @@ module.exports = {
     }),
   },
   makers: [
-    { name: "@electron-forge/maker-squirrel", config: { name: "scroll-companion" } },
-    { name: "@electron-forge/maker-dmg", config: { name: "Scroll Companion" } },
-    { name: "@electron-forge/maker-deb", config: { name: "scroll-companion" } },
+    { name: "@electron-forge/maker-squirrel", config: { name: "scroll-companion", iconUrl: "https://unfeed.news/icons/favicon.ico", setupIcon: "./assets/icon.ico" } },
+    { name: "@electron-forge/maker-dmg", config: { name: "Scroll Companion", icon: "./assets/icon.icns" } },
+    { name: "@electron-forge/maker-deb", config: { name: "scroll-companion", icon: "./assets/icon.png" } },
   ],
   plugins: [{ name: "@electron-forge/plugin-auto-unpack-natives", config: {} }],
 };

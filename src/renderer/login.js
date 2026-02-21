@@ -117,16 +117,5 @@
 		window.unfeed?.quit?.();
 	});
 
-	async function showApiBase() {
-		const el = document.getElementById("apiBaseHint");
-		if (!el || !window.unfeed?.getApiBase) return;
-		try {
-			el.textContent = "API: " + (await window.unfeed.getApiBase());
-		} catch {
-			el.textContent = "";
-		}
-	}
-
-	showApiBase();
 	checkExistingAuth();
 })();
