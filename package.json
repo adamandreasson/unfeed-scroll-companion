@@ -1,6 +1,6 @@
 {
 	"name": "scroll-companion",
-	"version": "1.0.9",
+	"version": "1.0.10",
 	"description": "Scroll Companion – Unfeed AI desktop client for social feed scrolling",
 	"author": "Adam Andreasson <unfeed@adamandreasson.se>",
 	"type": "module",
@@ -24,6 +24,6 @@
 		"electron": "^28.0.0"
 	},
 	"config": {
-		"forge": "./forge.config.js"
+		"forge": "./forge.config.cjs"
 	}
 }
