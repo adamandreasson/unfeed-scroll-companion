@@ -69,6 +69,20 @@ npm run package     # Creates app bundle in out/
 npm run make        # Creates platform installers (DMG, Squirrel, deb)
 ```
 
+## Releases
+
+Pre-built binaries are published on the [Releases](https://github.com/adamandreasson/scroll-companion/releases) page:
+
+| Platform | Artifacts |
+|----------|-----------|
+| **macOS** (Apple Silicon) | DMG |
+| **Linux** | .deb |
+| **Windows** | Squirrel installer (Setup.exe) |
+
+1. Bump `version` in `package.json` to match the release (e.g. `1.0.1`).
+2. Commit, push, then create a new release on GitHub with a tag like `v1.0.1`.
+3. Publish the release; the **Release** workflow will build on all three platforms and attach the installers to the release.
+
 ## Adding a new platform
 
 1. Create a new class extending `PlatformBase` in `src/main/platforms/`.

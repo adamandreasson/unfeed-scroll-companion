@@ -1,6 +1,6 @@
 {
 	"name": "scroll-companion",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Scroll Companion – Unfeed AI desktop client for social feed scrolling",
 	"type": "module",
 	"main": "src/main/index.js",
