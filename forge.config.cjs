@@ -2,6 +2,7 @@
 module.exports = {
   packagerConfig: {
     asar: true,
+    executableName: "scroll-companion",
     icon: "./assets/icon",
     ...(process.platform === "darwin" && {
       osxSign: {
