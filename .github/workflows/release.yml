@@ -47,6 +47,21 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npm run make
 
+      - name: Verify code signature and notarization (Gatekeeper)
+        run: |
+          dmg=$(find out/make -type f -name "*.dmg" 2>/dev/null | head -1)
+          if [ -z "$dmg" ]; then echo "No DMG found"; exit 1; fi
+          echo "Checking DMG: $dmg"
+          hdiutil attach -nobrowse -readonly -mountpoint /tmp/dmg-check "$dmg"
+          app=$(find /tmp/dmg-check -maxdepth 1 -name "*.app" -type d | head -1)
+          if [ -z "$app" ]; then echo "No .app in DMG"; hdiutil detach /tmp/dmg-check 2>/dev/null; exit 1; fi
+          echo "=== Code signature ==="
+          codesign -dv --verbose=4 "$app" 2>&1 || true
+          echo "=== Gatekeeper assessment (spctl) ==="
+          spctl -a -vvv -t install "$app" 2>&1 || true
+          hdiutil detach /tmp/dmg-check 2>/dev/null || true
+          echo "If spctl shows 'accepted' and signature shows 'Authority=Developer ID Application', the app should open on other Macs. If not, ensure APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID are set so notarization runs."
+
       - name: Rename artifacts
         run: |
           set +e
