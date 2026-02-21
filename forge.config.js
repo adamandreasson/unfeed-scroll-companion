@@ -5,7 +5,12 @@ module.exports = {
     ...(process.platform === "darwin" && {
       osxSign: {
         // Use the keychain created in CI (Import step); osx-sign looks up "Developer ID Application:" there
-        ...(process.env.CSC_KEYCHAIN && { keychain: process.env.CSC_KEYCHAIN }),
+        ...(process.env.CSC_KEYCHAIN && {
+          keychain: process.env.CSC_KEYCHAIN,
+          identity: "Developer ID Application:",
+          // Fail the build if signing fails (don't silently ship adhoc-signed)
+          continueOnError: false,
+        }),
       },
       ...(process.env.APPLE_ID &&
         process.env.APPLE_APP_SPECIFIC_PASSWORD &&
