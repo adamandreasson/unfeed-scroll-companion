@@ -49,21 +49,27 @@ jobs:
 
       - name: Rename artifacts
         run: |
+          set +e
+          echo "Contents of out/make:"
+          ls -laR out/make || true
           tag="${{ github.event.release.tag_name }}"
           version="${tag#v}"
           mkdir -p release-artifacts
-          dmg=$(find out/make -type f -name "*.dmg" | head -1)
+          dmg=$(find out/make -type f -name "*.dmg" 2>/dev/null | head -1)
           [ -n "$dmg" ] && cp "$dmg" "release-artifacts/Scroll-Companion-${version}-macos-arm64.dmg"
-          zip=$(find out/make -type f -name "*.zip" | head -1)
+          zip=$(find out/make -type f -name "*.zip" 2>/dev/null | head -1)
           [ -n "$zip" ] && cp "$zip" "release-artifacts/Scroll-Companion-${version}-macos-arm64.zip"
+          set -e
+          ls -la release-artifacts/ || true
 
       - name: Upload to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag="${{ github.event.release.tag_name }}"
+          shopt -s nullglob
           for f in release-artifacts/*; do
-            [ -f "$f" ] && gh release upload "$tag" "$f" --clobber
+            gh release upload "$tag" "$f" --clobber
           done
 
   build-linux:
