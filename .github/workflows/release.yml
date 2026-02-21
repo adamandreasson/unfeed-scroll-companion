@@ -47,7 +47,18 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npm run make
+        run: |
+          if [ -n "$CSC_KEYCHAIN" ] && [ -f "$CSC_KEYCHAIN" ]; then
+            echo "Setting signing keychain as default and verifying identity..."
+            security list-keychains -d user -s "$CSC_KEYCHAIN"
+            security default-keychain -s "$CSC_KEYCHAIN"
+            security unlock-keychain -p actions "$CSC_KEYCHAIN"
+            echo "Identities available for codesigning:"
+            security find-identity -v -p codesigning "$CSC_KEYCHAIN"
+          else
+            echo "CSC_KEYCHAIN not set or file missing; build will be unsigned."
+          fi
+          npm run make
 
       - name: Verify code signature and notarization (Gatekeeper)
         run: |
