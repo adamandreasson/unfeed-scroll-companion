@@ -26,7 +26,8 @@ module.exports = {
     }),
   },
   makers: [
-    { name: "@electron-forge/maker-squirrel", config: { name: "scroll-companion", authors: "Adam Andreasson", description: "Scroll Companion – Unfeed AI desktop client", iconUrl: "https://unfeed.ai/icons/favicon.ico", setupIcon: "./assets/icon.ico" } },
+    { name: "@electron-forge/maker-squirrel", config: { name: "scroll-companion", authors: "Scroll Companion", description: "Scroll Companion – Unfeed AI desktop client", iconUrl: "https://unfeed.ai/icons/favicon.ico", setupIcon: "./assets/icon.ico", loadingGif: "./assets/installer-splash.gif" } },
+    { name: "@electron-forge/maker-zip", platforms: ["darwin"] },
     { name: "@electron-forge/maker-dmg", config: { name: "Scroll Companion", icon: "./assets/icon.icns" } },
     { name: "@electron-forge/maker-deb", config: { name: "scroll-companion", icon: "./assets/icon.png" } },
   ],

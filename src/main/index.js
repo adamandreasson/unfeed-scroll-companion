@@ -10,6 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, "..", "..", ".env") });
 
 import { app, BrowserWindow, screen, session, ipcMain } from "electron";
+import { handleSquirrelEvent } from "./handle-squirrel.js";
 import {
 	createTray,
 	updateTrayMenu,
@@ -22,24 +23,16 @@ import { startScheduler } from "./scheduler.js";
 import { setupAutoUpdate } from "./updater.js";
 import { isDev, devLog } from "./log.js";
 
-registerIpcHandlers();
+// Handle Squirrel.Windows lifecycle events (install/update/uninstall).
+// The handler calls app.quit() internally — skip all normal initialization.
+const isSquirrelStartup = handleSquirrelEvent();
+const isFirstRun = process.argv.includes("--squirrel-firstrun");
 
 /** @type {BrowserWindow | null} */
 let loginWindow = null;
 /** @type {BrowserWindow | null} */
 let popupWindow = null;
 let tray = null;
-
-ipcMain.handle("loginComplete", () => {
-	loginWindow?.close();
-});
-ipcMain.handle("logoutComplete", () => {
-	popupWindow?.close();
-	showLoginWindow();
-});
-ipcMain.handle("quit", () => {
-	app.quit();
-});
 
 const preloadPath = path.join(__dirname, "..", "preload", "preload.cjs");
 const loginPath = path.join(__dirname, "..", "renderer", "login.html");
@@ -48,6 +41,7 @@ const appIconPath = path.join(__dirname, "..", "..", "assets", "icon.ico");
 
 const POPUP_WIDTH = 380;
 const POPUP_HEIGHT = 250;
+const POPUP_GAP = 4;
 
 function createLoginWindow() {
 	if (loginWindow && !loginWindow.isDestroyed()) return loginWindow;
@@ -84,6 +78,7 @@ function createPopupWindow() {
 		show: false,
 		frame: false,
 		resizable: false,
+		alwaysOnTop: true,
 		icon: appIconPath,
 		autoHideMenuBar: true,
 		transparent: process.platform === "darwin",
@@ -109,8 +104,6 @@ function createPopupWindow() {
 	return popupWindow;
 }
 
-const POPUP_GAP = 4;
-
 function positionPopupNearTray() {
 	const bounds = getTrayBounds();
 	if (!bounds || !popupWindow || popupWindow.isDestroyed()) return;
@@ -121,7 +114,6 @@ function positionPopupNearTray() {
 	const wa = display.workArea;
 	const da = display.bounds;
 
-	// Detect which edge the taskbar occupies by comparing workArea to full display bounds.
 	const taskbarBottom = da.y + da.height - (wa.y + wa.height);
 	const taskbarTop = wa.y - da.y;
 	const taskbarLeft = wa.x - da.x;
@@ -131,24 +123,19 @@ function positionPopupNearTray() {
 	let x, y;
 
 	if (maxEdge === taskbarBottom || (maxEdge === 0 && bounds.y > wa.y + wa.height / 2)) {
-		// Taskbar at bottom (or ambiguous but tray is in lower half): popup above
 		x = Math.round(trayCenterX - POPUP_WIDTH / 2);
 		y = Math.round(bounds.y - POPUP_HEIGHT - POPUP_GAP);
 	} else if (maxEdge === taskbarTop) {
-		// Taskbar at top: popup below
 		x = Math.round(trayCenterX - POPUP_WIDTH / 2);
 		y = Math.round(bounds.y + bounds.height + POPUP_GAP);
 	} else if (maxEdge === taskbarLeft) {
-		// Taskbar at left: popup to the right
 		x = Math.round(bounds.x + bounds.width + POPUP_GAP);
 		y = Math.round(trayCenterY - POPUP_HEIGHT / 2);
 	} else {
-		// Taskbar at right: popup to the left
 		x = Math.round(bounds.x - POPUP_WIDTH - POPUP_GAP);
 		y = Math.round(trayCenterY - POPUP_HEIGHT / 2);
 	}
 
-	// Clamp to workArea so the popup never goes off-screen
 	x = Math.max(wa.x, Math.min(x, wa.x + wa.width - POPUP_WIDTH));
 	y = Math.max(wa.y, Math.min(y, wa.y + wa.height - POPUP_HEIGHT));
 
@@ -194,34 +181,52 @@ function initApp() {
 
 	if (!getJwt()) {
 		createLoginWindow();
+	} else if (isFirstRun) {
+		showPopup();
 	}
 }
 
-app.whenReady().then(() => {
-	if (process.platform === "darwin") {
-		app.dock.hide();
-	}
-	try {
-		app.setLoginItemSettings({ openAtLogin: getOpenAtLogin() });
-	} catch {}
-	setupAutoUpdate();
-	devLog("[main] API base:", getApiBase());
-	initApp();
+// ── Only run the app when NOT handling a Squirrel lifecycle event ──
+if (!isSquirrelStartup) {
+	registerIpcHandlers();
 
-	app.on("activate", () => {
-		if (BrowserWindow.getAllWindows().length === 0) initApp();
-		else onTrayClick();
+	ipcMain.handle("loginComplete", () => {
+		loginWindow?.close();
 	});
-});
+	ipcMain.handle("logoutComplete", () => {
+		popupWindow?.close();
+		showLoginWindow();
+	});
+	ipcMain.handle("quit", () => {
+		app.quit();
+	});
 
-app.on("window-all-closed", () => {
-	// Tray app: keep running with no windows; user quits via tray menu.
-});
+	app.whenReady().then(() => {
+		if (process.platform === "darwin") {
+			app.dock.hide();
+		}
+		try {
+			app.setLoginItemSettings({ openAtLogin: getOpenAtLogin() });
+		} catch {}
+		setupAutoUpdate();
+		devLog("[main] API base:", getApiBase());
+		initApp();
 
-app.on("before-quit", () => {
-	app.isQuitting = true;
-	destroyTray();
-});
+		app.on("activate", () => {
+			if (BrowserWindow.getAllWindows().length === 0) initApp();
+			else onTrayClick();
+		});
+	});
+
+	app.on("window-all-closed", () => {
+		// Tray app: keep running with no windows; user quits via tray menu.
+	});
+
+	app.on("before-quit", () => {
+		app.isQuitting = true;
+		destroyTray();
+	});
+}
 
 /**
  * Get the persistent session for a social media platform.

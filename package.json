@@ -1,9 +1,9 @@
 {
 	"name": "scroll-companion",
 	"productName": "Scroll Companion",
-	"version": "1.0.12",
+	"version": "1.0.14",
 	"description": "Scroll Companion – Unfeed AI desktop client for social feed scrolling",
-	"author": "Adam Andreasson <unfeed@adamandreasson.se>",
+	"author": "Scroll Companion",
 	"type": "module",
 	"main": "src/main/index.js",
 	"scripts": {
@@ -13,14 +13,14 @@
 	},
 	"dependencies": {
 		"dotenv": "^16.3.1",
-		"electron-store": "^8.1.0",
-		"electron-updater": "^6.1.0"
+		"electron-store": "^8.1.0"
 	},
 	"devDependencies": {
 		"@electron-forge/cli": "^7.2.0",
 		"@electron-forge/maker-deb": "^7.2.0",
 		"@electron-forge/maker-dmg": "^7.2.0",
 		"@electron-forge/maker-squirrel": "^7.2.0",
+		"@electron-forge/maker-zip": "^7.2.0",
 		"@electron-forge/plugin-auto-unpack-natives": "^7.2.0",
 		"electron": "^28.0.0"
 	},
