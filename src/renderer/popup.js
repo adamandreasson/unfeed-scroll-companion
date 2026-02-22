@@ -132,6 +132,15 @@
 		} catch {}
 	}
 
+	async function showVersionInTitle() {
+		const titleEl = document.querySelector(".popup-title");
+		if (!titleEl || !window.unfeed?.getVersion) return;
+		try {
+			const version = await window.unfeed.getVersion();
+			if (version) titleEl.textContent = `Scroll Companion v${version}`;
+		} catch {}
+	}
+
 	async function init() {
 		if (!window.unfeed) {
 			showFeedStatus("Error: Application not initialized");
@@ -139,6 +148,7 @@
 			return;
 		}
 		await Promise.all([
+			showVersionInTitle(),
 			refreshFeedStatus(),
 			refreshLastScrollTime(),
 			refreshPlatformLabel(),

@@ -1,7 +1,7 @@
 /**
  * IPC handlers bridging renderer ↔ main process.
  */
-import { ipcMain, session } from "electron";
+import { app, ipcMain, session } from "electron";
 import * as store from "./store.js";
 import {
 	uploadPosts as apiUploadPosts,
@@ -10,6 +10,9 @@ import {
 import { devLog } from "./log.js";
 
 export function registerIpcHandlers() {
+	// App info
+	ipcMain.handle("getVersion", () => app.getVersion());
+
 	// Logging
 	ipcMain.handle("log", (_, ...args) => devLog("[renderer]", ...args));
 

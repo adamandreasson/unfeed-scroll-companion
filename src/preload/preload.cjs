@@ -10,6 +10,9 @@ ipcRenderer.on("scroll-progress", (_, data) => {
 });
 
 contextBridge.exposeInMainWorld("unfeed", {
+	// App info
+	getVersion: () => ipcRenderer.invoke("getVersion"),
+
 	// Logging
 	log: (...args) => ipcRenderer.invoke("log", ...args),
 
