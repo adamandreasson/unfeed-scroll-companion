@@ -28,19 +28,6 @@
 		if (feedStatusRow) feedStatusRow.style.display = "none";
 	}
 
-	function decodeJwtPayload(token) {
-		if (!token || typeof token !== "string") return null;
-		const parts = token.split(".");
-		if (parts.length < 2) return null;
-		try {
-			const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-			const pad = b64.length % 4 ? "=".repeat(4 - (b64.length % 4)) : "";
-			return JSON.parse(atob(b64 + pad));
-		} catch {
-			return null;
-		}
-	}
-
 	function formatTimeAgo(timestamp) {
 		if (!timestamp) return "";
 		const diffMs = Date.now() - new Date(timestamp).getTime();
@@ -105,21 +92,17 @@
 	}
 
 	async function refreshUnfeedIdentity() {
-		if (!unfeedAccountInfo || !window.unfeed?.getJwt) return;
+		if (!unfeedAccountInfo || !window.unfeed?.getAuthToken) return;
 		try {
-			const token = await window.unfeed.getJwt();
+			const token = await window.unfeed.getAuthToken();
 			if (!token) {
 				unfeedAccountInfo.textContent = "Not logged in";
 				return;
 			}
-			const payload = decodeJwtPayload(token);
-			unfeedAccountInfo.textContent = String(
-				payload?.email ||
-					payload?.username ||
-					payload?.name ||
-					payload?.sub ||
-					"Logged in",
-			);
+			const sessionEmail =
+				window.unfeed?.getSessionEmail &&
+				(await window.unfeed.getSessionEmail());
+			unfeedAccountInfo.textContent = sessionEmail || "Logged in";
 		} catch {
 			unfeedAccountInfo.textContent = "Logged in";
 		}
@@ -220,17 +203,17 @@
 	});
 
 	logoutBtn?.addEventListener("click", async () => {
-		if (!window.unfeed?.setJwt) return;
+		if (!window.unfeed?.setAuthToken) return;
 		logoutBtn.disabled = true;
 		try {
 			if (window.unfeed?.clearAllSocialSessions)
 				await window.unfeed.clearAllSocialSessions();
-			await window.unfeed.setJwt(null);
+			await window.unfeed.setAuthToken(null);
 			if (unfeedAccountInfo) unfeedAccountInfo.textContent = "Not logged in";
 			await refreshPlatformLabel();
 			window.unfeed?.logoutComplete?.();
 		} catch {
-			await window.unfeed.setJwt(null);
+			await window.unfeed.setAuthToken(null);
 			if (unfeedAccountInfo) unfeedAccountInfo.textContent = "Not logged in";
 			window.unfeed?.logoutComplete?.();
 		} finally {

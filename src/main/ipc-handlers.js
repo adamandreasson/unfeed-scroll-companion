@@ -18,8 +18,9 @@ export function registerIpcHandlers() {
 
 	// Store: auth
 	ipcMain.handle("getApiBase", () => store.getApiBase());
-	ipcMain.handle("getJwt", () => store.getJwt());
-	ipcMain.handle("setJwt", (_, token) => store.setJwt(token));
+	ipcMain.handle("getAuthToken", () => store.getAuthToken());
+	ipcMain.handle("setAuthToken", (_, token) => store.setAuthToken(token));
+	ipcMain.handle("getSessionEmail", () => store.getSessionEmail());
 
 	// Store: settings
 	ipcMain.handle("getScrollIntervalHours", () =>
@@ -131,11 +132,18 @@ export function registerIpcHandlers() {
 		try {
 			const res = await fetch(`${base}/api/auth/verify-pin`, {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: {
+					"Content-Type": "application/json",
+					"X-Client-Session": "true",
+				},
 				body: JSON.stringify({ email, pin }),
 			});
 			const data = await res.json().catch(() => ({}));
-			if (res.ok && data.token) return { ok: true, token: data.token };
+			if (res.ok && data.token) {
+				store.setAuthToken(data.token);
+				if (data.email) store.setSessionEmail(data.email);
+				return { ok: true, token: data.token, email: data.email };
+			}
 			return { ok: false, error: data.error || "Invalid or expired code" };
 		} catch (e) {
 			return { ok: false, error: e?.message || "Network error" };

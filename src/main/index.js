@@ -17,7 +17,7 @@ import {
 	destroyTray,
 	getTrayBounds,
 } from "./tray.js";
-import { getOpenAtLogin, getApiBase, getJwt } from "./store.js";
+import { getOpenAtLogin, getApiBase, getAuthToken } from "./store.js";
 import { registerIpcHandlers } from "./ipc-handlers.js";
 import { startScheduler } from "./scheduler.js";
 import { setupAutoUpdate } from "./updater.js";
@@ -163,7 +163,7 @@ function showLoginWindow() {
 
 /** Called when user clicks the tray icon. */
 function onTrayClick() {
-	if (getJwt()) {
+	if (getAuthToken()) {
 		if (popupWindow && !popupWindow.isDestroyed() && popupWindow.isVisible()) {
 			popupWindow.close();
 		} else {
@@ -179,7 +179,7 @@ function initApp() {
 	updateTrayMenu();
 	startScheduler();
 
-	if (!getJwt()) {
+	if (!getAuthToken()) {
 		createLoginWindow();
 	} else if (isFirstRun) {
 		showPopup();

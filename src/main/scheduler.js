@@ -2,7 +2,7 @@
  * Periodic social media feed scroll and upload.
  * Checks with the backend every 20 minutes; the server decides when scrolling is needed.
  */
-import { getJwt } from "./store.js";
+import { getAuthToken } from "./store.js";
 import { scrollSocialFeed } from "./scroller.js";
 import { uploadPosts, canStartScroll } from "./api-client.js";
 import { devLog } from "./log.js";
@@ -20,7 +20,7 @@ let scrollInProgress = false;
  */
 async function executeScroll(opts = {}) {
 	if (scrollInProgress) throw new Error("Scroll already in progress");
-	if (!getJwt()) throw new Error("Not logged in");
+	if (!getAuthToken()) throw new Error("Not logged in");
 
 	scrollInProgress = true;
 	try {
@@ -53,7 +53,7 @@ async function executeScroll(opts = {}) {
 export async function attemptScrollWithBackendCheck(opts = {}) {
 	if (scrollInProgress)
 		return { skipped: true, reason: "Scroll already in progress" };
-	if (!getJwt()) return { skipped: true, reason: "Not logged in" };
+	if (!getAuthToken()) return { skipped: true, reason: "Not logged in" };
 
 	try {
 		const { allowed, nextAllowedAt, error } = await canStartScroll();
@@ -74,7 +74,7 @@ export async function attemptScrollWithBackendCheck(opts = {}) {
  * Periodic check: ask backend if scrolling is needed, and scroll if allowed.
  */
 async function checkAndScrollIfNeeded() {
-	if (!getJwt() || scrollInProgress) return;
+	if (!getAuthToken() || scrollInProgress) return;
 
 	try {
 		const { allowed, nextAllowedAt, error } = await canStartScroll();

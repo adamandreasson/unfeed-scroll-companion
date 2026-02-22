@@ -18,8 +18,9 @@ contextBridge.exposeInMainWorld("unfeed", {
 
 	// Auth
 	getApiBase: () => ipcRenderer.invoke("getApiBase"),
-	getJwt: () => ipcRenderer.invoke("getJwt"),
-	setJwt: (token) => ipcRenderer.invoke("setJwt", token),
+	getAuthToken: () => ipcRenderer.invoke("getAuthToken"),
+	setAuthToken: (token) => ipcRenderer.invoke("setAuthToken", token),
+	getSessionEmail: () => ipcRenderer.invoke("getSessionEmail"),
 	requestPin: (email) => ipcRenderer.invoke("requestPin", email),
 	verifyPin: (email, pin) => ipcRenderer.invoke("verifyPin", email, pin),
 

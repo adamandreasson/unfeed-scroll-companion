@@ -26,7 +26,7 @@
 
 	async function checkExistingAuth() {
 		if (!window.unfeed) return;
-		const token = await window.unfeed.getJwt();
+		const token = await window.unfeed.getAuthToken();
 		if (token) {
 			try {
 				await window.unfeed.loginComplete?.();
@@ -90,7 +90,7 @@
 			}
 			const result = await window.unfeed.verifyPin(email, pin);
 			if (result?.ok && result?.token) {
-				await window.unfeed.setJwt(result.token);
+				await window.unfeed.setAuthToken(result.token);
 				showSuccess("Logged in. Closing…");
 				setTimeout(async () => {
 					try {

@@ -2,7 +2,7 @@
  * HTTP client for the unfeed.ai API.
  * Handles post uploads, scroll permission checks, and feed status retrieval.
  */
-import { getJwt, getApiBase } from "./store.js";
+import { getAuthToken, getApiBase } from "./store.js";
 import { devLog, devWarn } from "./log.js";
 
 const MAX_RETRIES = 3;
@@ -52,7 +52,7 @@ export async function uploadPosts(posts, platformId) {
 		platformId = getDefaultPlatform().getPlatformId();
 	}
 	const count = posts?.length ?? 0;
-	const token = getJwt();
+	const token = getAuthToken();
 	if (!token) {
 		devWarn("[api] uploadPosts: not logged in");
 		return { saved: 0, total: count, error: "Not logged in" };
@@ -105,7 +105,7 @@ export async function uploadPosts(posts, platformId) {
  * @returns {Promise<{ allowed: boolean, nextAllowedAt?: string | null, error?: string }>}
  */
 export async function canStartScroll() {
-	const token = getJwt();
+	const token = getAuthToken();
 	if (!token) return { allowed: false, error: "Not logged in" };
 
 	try {
@@ -138,7 +138,7 @@ export async function canStartScroll() {
  * @returns {Promise<{ connected: boolean, lastUploadAt: string | null, postCountLast24h: number, error?: string }>}
  */
 export async function getSocialFeedStatus() {
-	const token = getJwt();
+	const token = getAuthToken();
 	if (!token) {
 		return { connected: false, lastUploadAt: null, postCountLast24h: 0 };
 	}
