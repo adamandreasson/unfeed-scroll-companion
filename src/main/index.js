@@ -9,7 +9,7 @@ import dotenv from "dotenv";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, "..", "..", ".env") });
 
-import { app, BrowserWindow, session, ipcMain } from "electron";
+import { app, BrowserWindow, screen, session, ipcMain } from "electron";
 import {
 	createTray,
 	updateTrayMenu,
@@ -44,6 +44,7 @@ ipcMain.handle("quit", () => {
 const preloadPath = path.join(__dirname, "..", "preload", "preload.cjs");
 const loginPath = path.join(__dirname, "..", "renderer", "login.html");
 const popupPath = path.join(__dirname, "..", "renderer", "popup.html");
+const appIconPath = path.join(__dirname, "..", "..", "assets", "icon.ico");
 
 const POPUP_WIDTH = 380;
 const POPUP_HEIGHT = 250;
@@ -54,6 +55,8 @@ function createLoginWindow() {
 		width: 380,
 		height: 420,
 		show: false,
+		icon: appIconPath,
+		autoHideMenuBar: true,
 		webPreferences: {
 			preload: preloadPath,
 			contextIsolation: true,
@@ -81,6 +84,8 @@ function createPopupWindow() {
 		show: false,
 		frame: false,
 		resizable: false,
+		icon: appIconPath,
+		autoHideMenuBar: true,
 		transparent: process.platform === "darwin",
 		hasShadow: true,
 		roundedCorners: true,
@@ -104,23 +109,61 @@ function createPopupWindow() {
 	return popupWindow;
 }
 
-function positionPopupUnderTray() {
+const POPUP_GAP = 4;
+
+function positionPopupNearTray() {
 	const bounds = getTrayBounds();
 	if (!bounds || !popupWindow || popupWindow.isDestroyed()) return;
-	const x = Math.round(bounds.x + bounds.width - POPUP_WIDTH);
-	const y = Math.round(bounds.y + bounds.height + 4);
+
+	const trayCenterX = bounds.x + bounds.width / 2;
+	const trayCenterY = bounds.y + bounds.height / 2;
+	const display = screen.getDisplayNearestPoint({ x: trayCenterX, y: trayCenterY });
+	const wa = display.workArea;
+	const da = display.bounds;
+
+	// Detect which edge the taskbar occupies by comparing workArea to full display bounds.
+	const taskbarBottom = da.y + da.height - (wa.y + wa.height);
+	const taskbarTop = wa.y - da.y;
+	const taskbarLeft = wa.x - da.x;
+	const taskbarRight = da.x + da.width - (wa.x + wa.width);
+	const maxEdge = Math.max(taskbarBottom, taskbarTop, taskbarLeft, taskbarRight);
+
+	let x, y;
+
+	if (maxEdge === taskbarBottom || (maxEdge === 0 && bounds.y > wa.y + wa.height / 2)) {
+		// Taskbar at bottom (or ambiguous but tray is in lower half): popup above
+		x = Math.round(trayCenterX - POPUP_WIDTH / 2);
+		y = Math.round(bounds.y - POPUP_HEIGHT - POPUP_GAP);
+	} else if (maxEdge === taskbarTop) {
+		// Taskbar at top: popup below
+		x = Math.round(trayCenterX - POPUP_WIDTH / 2);
+		y = Math.round(bounds.y + bounds.height + POPUP_GAP);
+	} else if (maxEdge === taskbarLeft) {
+		// Taskbar at left: popup to the right
+		x = Math.round(bounds.x + bounds.width + POPUP_GAP);
+		y = Math.round(trayCenterY - POPUP_HEIGHT / 2);
+	} else {
+		// Taskbar at right: popup to the left
+		x = Math.round(bounds.x - POPUP_WIDTH - POPUP_GAP);
+		y = Math.round(trayCenterY - POPUP_HEIGHT / 2);
+	}
+
+	// Clamp to workArea so the popup never goes off-screen
+	x = Math.max(wa.x, Math.min(x, wa.x + wa.width - POPUP_WIDTH));
+	y = Math.max(wa.y, Math.min(y, wa.y + wa.height - POPUP_HEIGHT));
+
 	popupWindow.setPosition(x, y);
 }
 
 function showPopup() {
 	const win = createPopupWindow();
 	if (!win.isDestroyed() && win.webContents && !win.webContents.isLoading()) {
-		positionPopupUnderTray();
+		positionPopupNearTray();
 		win.show();
 		win.focus();
 	} else {
 		win.once("ready-to-show", () => {
-			positionPopupUnderTray();
+			positionPopupNearTray();
 			win.show();
 			win.focus();
 		});
@@ -200,6 +243,8 @@ export function getSocialSession(platformId) {
 export function createSocialBrowserWindow(platformId, options = {}) {
 	return new BrowserWindow({
 		...options,
+		icon: appIconPath,
+		autoHideMenuBar: true,
 		webPreferences: {
 			...options.webPreferences,
 			session: getSocialSession(platformId),

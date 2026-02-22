@@ -20,12 +20,21 @@ function getIconSearchDirs() {
 	}
 	dirs.push(path.join(__dirname, "..", "renderer", "icons"));
 	dirs.push(path.join(app.getAppPath(), "src", "renderer", "icons"));
+	// assets/ dir as final fallback (contains the full app icon)
+	dirs.push(path.join(__dirname, "..", "..", "assets"));
+	if (app.isPackaged) {
+		dirs.push(path.join(process.resourcesPath, "app", "assets"));
+	}
 	return dirs;
 }
 
 function getTrayIcon() {
 	const dirs = getIconSearchDirs();
-	const candidates = ["trayTemplate.png", "trayTemplate@2x.png", "tray.png"];
+
+	const candidates =
+		process.platform === "darwin"
+			? ["trayTemplate.png", "trayTemplate@2x.png", "tray.png"]
+			: ["tray.png", "icon.ico", "icon.png"];
 
 	let iconPath = null;
 	for (const name of candidates) {
@@ -42,7 +51,6 @@ function getTrayIcon() {
 	let img = iconPath ? nativeImage.createFromPath(iconPath) : null;
 	if (!img || img.isEmpty()) return nativeImage.createEmpty();
 
-	// macOS: mark as template image BEFORE any resize to preserve the alpha mask.
 	if (process.platform === "darwin") {
 		img.setTemplateImage(true);
 	} else {
