@@ -109,9 +109,18 @@ export function getTrayBounds() {
 /** No-op kept for API compatibility. Menu is built on right-click only. */
 export function updateTrayMenu() {}
 
+/**
+ * Destroy the tray. On macOS, we do not call tray.destroy() during app quit
+ * to avoid "Unhandled disconnected auxiliary scene" / BSBlockSentinel crash:
+ * the status item's auxiliary scene is torn down asynchronously and can race
+ * with process exit. Let the process exit clean up the status item instead.
+ */
 export function destroyTray() {
-	if (tray) {
-		tray.destroy();
+	if (!tray) return;
+	if (process.platform === "darwin") {
 		tray = null;
+		return;
 	}
+	tray.destroy();
+	tray = null;
 }
