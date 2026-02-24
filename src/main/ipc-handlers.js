@@ -110,18 +110,23 @@ export function registerIpcHandlers() {
 	);
 
 	// Auth: main process handles HTTP to avoid renderer CORS issues
+	// Request body matches frontend (account page): login_only: true for existing-account login
 	ipcMain.handle("requestPin", async (_, email) => {
 		const base = store.getApiBase();
 		try {
 			const res = await fetch(`${base}/api/auth/request-pin`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ email }),
+				body: JSON.stringify({ email, login_only: true }),
 			});
 			const data = await res.json().catch(() => ({}));
+			const hint =
+				!res.ok && base === "https://unfeed.ai"
+					? " If you use a custom backend, set UNFEED_API_BASE in .env to your backend URL (same as NEXT_PUBLIC_API_URL)."
+					: "";
 			return res.ok
 				? { ok: true }
-				: { ok: false, error: data.error || res.statusText };
+				: { ok: false, error: (data.error || res.statusText) + hint };
 		} catch (e) {
 			return { ok: false, error: e?.message || "Network error" };
 		}
